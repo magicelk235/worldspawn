@@ -1,4 +1,4 @@
-import gif_pygame, pygame, random,items,gui,default,math,objects,projectiles,numpy
+import gif_pygame, pygame, random,items,gui,default,math,objects,projectiles,numpy,pickle
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos, game):
@@ -43,20 +43,18 @@ class Player(pygame.sprite.Sprite):
         self.inventory.add_item(default.get_material('phoenix_feather'), 1)
         self.inventory_display = gui.inventory(game,player=self)
 
-    def load_form_file(self,path,id):
-        new_player = numpy.load(f"{path}/players/{id}.npy", None, True)
-        new_player = new_player[0]
-        self.path = new_player[0].path
-        self.rect = new_player[0].rect
-        self.id = id
-        self.direction = new_player[0].direction
-        self.face_direction = new_player[0].face_direction
-        self.speed = new_player[0].speed
-        self.inventory.inventory = new_player[0].inventory.inventory
-        self.gui_open = new_player[0].gui_open
-        self.hand = new_player[0].hand
-        self.health = new_player[0].health
+    def load_from_file(self,path,id):
+        with open(f"{path}/players/{id}.npy","rb") as f:
+            player_dict = pickle.load(f)
+            self.rect = player_dict["rect"]
+            self.id = id
+            self.health = player_dict["health"]
+            self.inventory = player_dict["inventory"]
 
+
+
+    def to_dict(self):
+        return {"id": self.id,"rect":self.rect,"inventory":self.inventory,"health":self.health}
 
     def reset_modifiers(self):
         self.max_health = 10
@@ -325,7 +323,7 @@ class entity(pygame.sprite.Sprite):
         self.vision_rect = pygame.Rect(pos[0],pos[1],self.entity_data.vision,self.entity_data.vision)
         self.max_health = self.health
         self.regeneration_time = 0
-        self.ignore_solid = entity_data.ignore_solid
+
         self.mob_type = entity_data.mob_type
         self.despawn_time = entity_data.despawn_time
         self.attack_damage = entity_data.attack_damage
@@ -401,6 +399,27 @@ class entity(pygame.sprite.Sprite):
         self.fed = False
         self.breed_target = None
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tag': self.tag,
+            'name': self.name,
+            'health': self.health,
+
+            'vision_rect': self.vision_rect,
+           'max_health': self.max_health,
+           'regeneration_time': self.regeneration_time,
+
+           'mob_type': self.mob_type,
+            'despawn_time': self.despawn_time,
+            'attack_damage': self.attack_damage,
+            'attack_delay': self.attack_delay,
+            'attack_cooldown': self.attack_cooldown,
+           'shield': self.shield,
+
+
+           'saddled': self.saddled,
+        }
 
     def remove(self):
         self.path = f'assets/entities/None'
@@ -602,7 +621,7 @@ class entity(pygame.sprite.Sprite):
                 self.crafting_menu_open = False
                 self.trade_menu_user = None
             else:
-                print(self.trade_list)
+                
                 self.trade_menu_user.crafting_gui.updator(self.trade_list, game)
                 for event in self.trade_menu_user.events:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
@@ -720,41 +739,6 @@ class entity(pygame.sprite.Sprite):
         for player in players:
             if self.rect.colliderect(player.render):
                 return True
-
-    def copy(self, other):
-        self.entity_data = other.entity_data
-
-        self.despawn_time = other.despawn_time
-        self.name = other.name
-        self.health = other.health
-        self.direction = other.direction
-        self.saddled = other.saddled
-        self.cooldown = other.cooldown
-        self.mob_type = other.mob_type
-        self.attack_damage = other.attack_damage
-        self.id = other.id
-        self.tag = other.tag
-        self.attack_delay = other.attack_delay
-        self.regeneration_time = other.regeneration_time
-        self.max_health = other.max_health
-        self.attack_cooldown = other.attack_cooldown
-        self.ignore_solid = other.ignore_solid
-        self.trade_list = other.trade_list
-
-        self.lootable_list = other.lootable_list
-        self.path = other.path
-        self.image = default.load_image(self.path)
-        self.rect = other.rect
-        self.vision_rect = other.vision_rect
-        self.created_path = other.created_path
-        self.cant_walk = other.cant_walk
-        self.walking_path = other.walking_path
-        self.path_point = other.path_point
-        self.max_path_point = other.max_path_point
-        self.walk_direction.y = other.walk_direction.y
-        self.walk_direction.x = other.walk_direction.x
-        self.way_x = other.way_x
-        self.way_y = other.way_y
 
     def apply_damage(self,damage,game,attacker=None):
         self.health -= round(damage*(1.0-self.shield))

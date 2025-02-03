@@ -2,9 +2,6 @@ import socket,default,json,gui
 import pygame
 import pickle
 
-
-
-
 class client:
     def __init__(self):
 
