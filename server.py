@@ -1,5 +1,4 @@
-import socket,entities,numpy,pygame,gui,random,events,default,entities,objects,items,json,threading,pickle
-from zeroconf import Zeroconf, ServiceInfo
+import socket,numpy,pygame,gui,random,events,default,entities,objects,items,threading
 
 class server:
     def __init__(self,path):
@@ -150,7 +149,7 @@ class server:
             new_blocks = numpy.load(f"{self.path}/blocks.npy", None, True)
             if len(self.objects) < len(new_blocks):
                 for i in range(len(new_blocks) - len(self.objects)):
-                    self.objects.append(objects.object(self, (10, 10), objects.get_object("rock")))
+                    self.objects.append(objects.object(self, (10, 10), default.get_object("rock")))
             for i in range(len(new_blocks)):
                 if new_blocks[i] != None:
                     self.objects[i].copy(new_blocks[i], self)
@@ -161,7 +160,7 @@ class server:
             new_entities = numpy.load(f"{self.path}/entities.npy", None, True)
             if len(self.entities) < len(new_entities):
                 for i in range(len(new_entities) - len(self.entities)):
-                    self.entities.append(entities.entity(self, entities.get_entity("cow"), (10, 10)))
+                    self.entities.append(entities.entity(self, default.get_entity("cow"), (10, 10)))
             for i in range(len(new_entities)):
                 if new_entities[i] != None:
                     self.entities[i].copy(new_entities[i], self)
@@ -241,9 +240,6 @@ class server:
                 threading.Thread(target=self.handle_client,args=(conn,addr)).start()
             except:
                 pass
-
-
-
         server.close()
 
     def game_update(self):
@@ -251,21 +247,25 @@ class server:
             if Block.render(self.players):
                 if Block.updator(self):
                     self.objects.remove(Block)
+                    self.camera_group.remove(Block)
                     del Block
         for Entity in self.entities:
             if Entity.render(self.players):
                 if Entity.updator(self):
                     self.entities.remove(Entity)
+                    self.camera_group.remove(Entity)
                     del Entity
         for drop in self.drops:
             if drop.render(self.players):
                 if drop.updator(self):
                     self.drops.remove(drop)
+                    self.camera_group.remove(drop)
                     del drop
         for Projectile in self.projectiles:
             if Projectile.render(self.players):
                 if Projectile.updator(self):
                     self.projectiles.remove(Projectile)
+                    self.camera_group.remove(Projectile)
                     del Projectile
         for event in self.events:
             event.updator(self)

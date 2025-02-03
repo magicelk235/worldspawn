@@ -43,7 +43,7 @@ class Player(pygame.sprite.Sprite):
         self.inventory.add_item(default.get_material('phoenix_feather'), 1)
         self.inventory_display = gui.inventory(game,player=self)
 
-    def load_from_file(self,path,id):
+    def from_dict(self,path,id):
         with open(f"{path}/players/{id}.npy","rb") as f:
             player_dict = pickle.load(f)
             self.rect = player_dict["rect"]
@@ -236,7 +236,6 @@ class Player(pygame.sprite.Sprite):
                 self.hotbar.display_array[x].rect.y += self.speed * self.direction.y
                 self.hotbar.display_array[x].text.rect.topleft += self.speed * self.direction
 
-
     def close(self):
         self.health_display.close()
         self.hotbar.close()
@@ -275,13 +274,18 @@ class tame:
                                 mob.tag = player.id
 
 class entity_data:
-    def __init__(self, name, health, lootable_list=None, mob_type="P", attack_damage=0, attack_cooldown=0,
+    def __init__(self, name, health, lootable_list=[], mob_type="P", attack_damage=0, attack_cooldown=0,
                  despawn_time=-1, knockback=1, vision=600, speed=3, shield=0.0, trade_list=None, summoner=None,
                  suicide=False, thrower=None, breed=None, kill_spawn=None, ride_data=None, ignore_solid=False,tame=None):
         self.vision = vision
         self.name = name
         self.health = health
-        self.lootable_list = lootable_list
+        try:
+            len(lootable_list)
+            self.lootable_list = lootable_list
+        except:
+            self.lootable_list = [lootable_list]
+
         self.mob_type = mob_type
         self.attack_damage = attack_damage
         self.attack_cooldown = attack_cooldown
@@ -304,32 +308,30 @@ class kill_spawn:
         self.name = name
         self.amount = amount
 
-
-# noinspection PyBroadException
 class entity(pygame.sprite.Sprite):
     def __init__(self, game, entity_data, pos, tag=None):
         super().__init__(game.camera_group)
         # entity info
-        self.entity_data = entity_data
-        self.name = entity_data.name
-        self.health = entity_data.health
+        self.entity_data = entity_data #
+        self.health = entity_data.health #
         self.direction = "left"
-        self.id = hash(self)
-        self.tag = tag
+        self.id = hash(self) #
+        self.tag = tag #
+        self.mob_type = entity_data.mob_type  #
         # P not attack
         # H attack
         # N attack when attacked
         # L loyal
-        self.vision_rect = pygame.Rect(pos[0],pos[1],self.entity_data.vision,self.entity_data.vision)
-        self.max_health = self.health
+        self.vision_rect = pygame.Rect(pos[0],pos[1],self.entity_data.vision,self.entity_data.vision) #
+
         self.regeneration_time = 0
 
-        self.mob_type = entity_data.mob_type
-        self.despawn_time = entity_data.despawn_time
-        self.attack_damage = entity_data.attack_damage
-        self.attack_delay = entity_data.attack_cooldown
+
+        self.despawn_time = entity_data.despawn_time #
+
+
         self.attack_cooldown = 0
-        self.shield = entity_data.shield
+        self.shield = entity_data.shield #
         self.ridden = False
         self.rider = None
         if self.mob_type == "H":
@@ -337,28 +339,18 @@ class entity(pygame.sprite.Sprite):
         else:
             self.attacker = None
 
-        self.saddled = False
+        self.saddled = False #
         if self.entity_data.ride_data != None and self.entity_data.ride_data.needed_item == None:
             self.saddled = True
-        self.knockback = entity_data.knockback
-        self.speed = entity_data.speed
-        # loot data
-        try:
-            len(entity_data.lootable_list)
-            self.lootable_list = entity_data.lootable_list
-        except:
-            self.lootable_list = [entity_data.lootable_list]
-        # trade data
-        self.trade_list = entity_data.trade_list
 
-        
+        self.speed = entity_data.speed #
 
         self.trade_menu_user = None
         self.crafting_menu_open = False
         spawn_kill = False
         if self.mob_type == "B":
             for e in game.entities:
-                if e.mob_type == "B" and e.name == self.name:
+                if e.mob_type == "B" and e.name == self.entity_data.name:
                     self.despawn_time = 1
                     spawn_kill = True
 
@@ -366,9 +358,9 @@ class entity(pygame.sprite.Sprite):
         if spawn_kill:
             self.path = f'assets/entities/None'
         else:
-            self.path = f'assets/entities/{self.name}'
+            self.path = f'assets/entities/{self.entity_data.name}'
         self.image = default.load_image(self.path)
-        self.rect = self.image.get_rect(midbottom=pos)
+        self.rect = self.image.get_rect(midbottom=pos) #
         self.flipped = False
         # move
         self.created_path = False
@@ -403,31 +395,30 @@ class entity(pygame.sprite.Sprite):
         return {
             'id': self.id,
             'tag': self.tag,
-            'name': self.name,
             'health': self.health,
-
             'vision_rect': self.vision_rect,
-           'max_health': self.max_health,
-           'regeneration_time': self.regeneration_time,
-
            'mob_type': self.mob_type,
             'despawn_time': self.despawn_time,
-            'attack_damage': self.attack_damage,
-            'attack_delay': self.attack_delay,
-            'attack_cooldown': self.attack_cooldown,
            'shield': self.shield,
-
-
+           'rect': self.rect,
+           'path': self.path,
            'saddled': self.saddled,
+            "entity_data":self.entity_data
         }
 
-    def remove(self):
-        self.path = f'assets/entities/None'
+    def from_dict(self,entity_dict):
+        self.id = entity_dict["id"]
+        self.tag = entity_dict["tag"]
+        self.health = entity_dict["health"]
+        self.vision_rect = entity_dict["vision_rect"]
+        self.mob_type = entity_dict["mob_type"]
+        self.despawn_time = entity_dict["despawn_time"]
+        self.shield = entity_dict["shield"]
+        self.rect = entity_dict["rect"]
+        self.path = entity_dict["path"]
         self.image = default.load_image(self.path)
-        self.rect.x = 9999999
-        self.rect.y = 9999999
-        self.rect = None
-        self.image = None
+        self.saddled = entity_dict["saddled"]
+        self.entity_data = entity_dict["entity_data"]
 
     def updator(self, game):
         # breed target finder
@@ -436,13 +427,13 @@ class entity(pygame.sprite.Sprite):
                 if self.entity_data.breed.duplicate:
                     for i in range(self.entity_data.breed.amount):
                         game.entities.append(
-                            entity(game.camera_group, default.get_entity(self.name), self.rect.center))
+                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.center))
                     self.fed = False
                 else:
                     closest = 10000000000000000
                     for Entity in game.entities:
                         if Entity != self:
-                            if Entity.fed and Entity.name == self.name:
+                            if Entity.fed and Entity.name == self.entity_data.name:
                                 if closest > math.sqrt(2**(self.rect.x-Entity.rect.x) + (self.rect.y-Entity.rect.y) ** 2):
                                     closest = math.sqrt(2**(self.rect.x-Entity.rect.x) + (self.rect.y-Entity.rect.y) ** 2)
                                     self.breed_target = Entity
@@ -452,19 +443,18 @@ class entity(pygame.sprite.Sprite):
                 for i in range(self.entity_data.kill_spawn.amount):
                     game.entities.append(entity(game, default.get_entity(self.entity_data.kill_spawn.name),(self.rect.x + random.randint(-50, 50), self.rect.y + random.randint(-50, 50))))
                     game.entities[-1].attacker = self.attacker
-            if self.lootable_list != [None]:
-                for i in range(len(self.lootable_list)):
-                    if random.random() < self.lootable_list[i].chance:
+            if self.entity_data.lootable_list != []:
+                for i in range(len(self.entity_data.lootable_list)):
+                    if random.random() < self.entity_data.lootable_list[i].chance:
                         game.drops.append(
-                            items.item(game, self.rect.center, self.lootable_list[i].count,
-                                        self.lootable_list[i].loot_data))
+                            items.item(game, self.rect.center, self.entity_data.lootable_list[i].count,
+                                        self.entity_data.lootable_list[i].loot_data))
             if self.ridden:
                 self.stop_riding()   
             # soul drop check
             
             if isinstance(self.attacker,Player) and self.attacker.hand.item_data.item_name == "scythe":
                 game.drops.append(items.item(game, self.rect.center, 1, default.get_material("soul")))
-            self.remove()
             return True
         try:
             if self.attacker != None:
@@ -505,11 +495,10 @@ class entity(pygame.sprite.Sprite):
                 self.entity_data.summoner.updator(game,self)
             # attack check
             if self.rect.colliderect(self.attacker.rect):
-                if self.attack_cooldown >= self.attack_delay:
+                if self.attack_cooldown >= self.entity_data.attack_cooldown:
                     self.attack_cooldown = 0
-                    self.attacker.apply_damage(self.attack_damage,game,self)
+                    self.attacker.apply_damage(self.entity_data.attack_damage,game,self)
                     if self.entity_data.suicide:
-                        self.remove()
                         return True
         # events
 
@@ -522,13 +511,12 @@ class entity(pygame.sprite.Sprite):
 
                 self.attack_cooldown += 1
 
-                if self.health < self.max_health:
+                if self.health < self.entity_data.health:
                     self.regeneration_time += 1
                 if self.despawn_time != -1:
                     self.despawn_time -= 1
                     # despawn time check
                     if self.despawn_time == 0:
-                        self.remove()
                         return True
                 if self.regeneration_time == 10:
                     self.health += 1
@@ -547,7 +535,7 @@ class entity(pygame.sprite.Sprite):
                                 self.apply_damage(player.damage,game,player)
                     elif event.button == 3 and player.block_selector.rect != None and self.rect.colliderect(player.block_selector.rect):
                         # trade menu check
-                        if self.trade_list != None:
+                        if self.entity_data.trade_list != None:
                             self.crafting_menu_open = True
                             self.trade_menu_user = player
                             self.trade_menu_user.inventory_display.open_inventory(game,player,player.inventory.inventory)
@@ -583,21 +571,22 @@ class entity(pygame.sprite.Sprite):
                 if self.flipped:
                     self.image = default.flip(self.image,True)
                     self.flipped = False
-        elif not self.breed_target != None:
-            # random walking/waking to player
-            if self.entity_data.breed != None and player.hand != None and player.hand.item_data.item_name == self.entity_data.breed.item_name:
-                self.walk_location(game,player.rect.x,player.rect.y)
-            elif self.attacker != None and self.attacker.rect != None and self.vision_rect.colliderect(self.attacker.rect):
-                self.walk_location(game,self.attacker.rect.centerx,self.attacker.rect.centery)
-            elif self.mob_type == "L":
-                player_loyal = default.get_player(game.players,self.tag)
 
-                if player_loyal != None and player_loyal.attacker != None and player_loyal.attacker.rect != None:
-                    self.attacker = player_loyal.attacker
+        elif not self.breed_target != None:
+            for player in game.players:
+                # random walking/waking to player
+                if self.entity_data.breed != None and player.hand != None and player.hand.item_data.item_name == self.entity_data.breed.item_name:
+                    self.walk_location(game,player.rect.x,player.rect.y)
+                elif self.attacker != None and self.attacker.rect != None and self.vision_rect.colliderect(self.attacker.rect):
+                    self.walk_location(game,self.attacker.rect.centerx,self.attacker.rect.centery)
+                elif self.mob_type == "L":
+                    player_loyal = default.get_player(game.players,self.tag)
+                    if player_loyal != None and player_loyal.attacker != None and player_loyal.attacker.rect != None:
+                        self.attacker = player_loyal.attacker
+                    else:
+                        self.walk_location(game,player_loyal.rect.x,player_loyal.rect.y)
                 else:
-                    self.walk_location(game,player_loyal.rect.x,player_loyal.rect.y)
-            else:
-                self.random_walking(game)
+                    self.random_walking(game)
             # breed system
         else:
             try:
@@ -611,7 +600,7 @@ class entity(pygame.sprite.Sprite):
                     self.breed_target = None
                     for i in range(self.entity_data.breed.amount):
                         game.entities.append(
-                            entity(game.camera_group, default.get_entity(self.name), self.rect.center))
+                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.center))
             except:
                 self.breed_target = None
         # trade menu
@@ -622,17 +611,12 @@ class entity(pygame.sprite.Sprite):
                 self.trade_menu_user = None
             else:
                 
-                self.trade_menu_user.crafting_gui.updator(self.trade_list, game)
+                self.trade_menu_user.crafting_gui.updator(self.entity_data.trade_list, game)
                 for event in self.trade_menu_user.events:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                         self.trade_menu_user.crafting_gui.close()
                         self.crafting_menu_open = False
                         self.trade_menu_user = None
-
-
-    def close(self):
-        
-        self.image = None
 
     def walking_solid(self, game, x,y):
         if not self.created_path and not self.rect.collidepoint(x,y) and not self.cant_walk:
@@ -750,19 +734,19 @@ class entity(pygame.sprite.Sprite):
                 for Entity in default.double_tag_list(game.entities,self.tag,self.id):
                     Entity.attacker = attacker
         if self.direction == "left":
-            self.rect.x += self.knockback + self.speed
+            self.rect.x += self.entity_data.knockback + self.speed
             self.direction = "right"
             self.cooldown = 40
         elif self.direction == "right":
-            self.rect.x -= self.knockback + self.speed
+            self.rect.x -= self.entity_data.knockback + self.speed
             self.direction = "left"
             self.cooldown = 40
         if self.direction == "up":
-            self.rect.y += self.knockback + self.speed
+            self.rect.y += self.entity_data.knockback + self.speed
             self.direction = "down"
             self.cooldown = 40
         elif self.direction == "down":
-            self.rect.y -= self.knockback + self.speed
+            self.rect.y -= self.entity_data.knockback + self.speed
             self.direction = "up"
             self.cooldown = 40
 

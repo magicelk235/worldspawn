@@ -29,13 +29,14 @@ class object_data:
 class object(pygame.sprite.Sprite):
     def __init__(self, game, pos, data, tag=None):
         super().__init__(game.camera_group)
-        self.name = data.name
-        self.stage = 1
-        self.plant_timer = 0
+        self.data = data #
+        self.name = data.name #
+        self.stage = 1 #
+        self.plant_timer = 0 #
         self.attacker = None
-        self.tag = tag
-        self.id = hash(self)
-        self.color = (255,255,255)
+        self.tag = tag #
+        self.id = hash(self) #
+        self.color = (255,255,255) #
         if data.type_range:
             type = str(random.randint(data.type_range.min_value, data.type_range.max_value))
             self.path = f'assets/objects/{self.name}{type}'
@@ -49,8 +50,8 @@ class object(pygame.sprite.Sprite):
         else:
             self.path = f'assets/objects/{self.name}'
             self.image = default.load_image(self.path)
-        self.is_solid = data.is_solid
-        self.rect = self.image.get_rect(topleft=pos)
+        self.is_solid = data.is_solid #
+        self.rect = self.image.get_rect(topleft=pos) #
         try:
             len(data.lootable_list)
             self.lootable_list = data.lootable_list
@@ -60,15 +61,46 @@ class object(pygame.sprite.Sprite):
             self.hitbox = default.hitbox(self.rect.w,self.rect.h)
         else:
             self.hitbox = data.hitbox
-        self.returner = None
+
         self.health = data.health
         self.crafting_gui_user = None
         self.crafting_gui_open = False
         self.rect_hitbox = pygame.Rect(self.rect.x+self.hitbox.offset_x,self.rect.y+self.hitbox.offset_y,self.hitbox.hitbox_x,self.hitbox.hitbox_y)
-        self.recipe_list = data.recipe_list
+
         self.summon_c = 0
         self.projectile_c = 0
-        self.data = data
+
+    def to_dict(self):
+        return {
+        "data":self.data,
+        "health":self.health,
+        "rect":self.rect,
+        "path":self.path,
+        "name":self.name,
+        "stage":self.stage,
+        "hitbox":self.hitbox,
+        "rect_hitbox":self.rect_hitbox,
+        "plant_timer":self.plant_timer,
+        "tag":self.tag,
+        "id":self.id,
+        "color":self.color
+        }
+
+    def from_dict(self,object_dict):
+        self.data = object_dict["data"]
+        self.health = object_dict["health"]
+        self.rect = object_dict["rect"]
+        self.path = object_dict["path"]
+        self.name = object_dict["name"]
+        self.stage = object_dict["stage"]
+        self.hitbox = object_dict["hitbox"]
+        self.rect_hitbox = object_dict["rect_hitbox"]
+        self.plant_timer = object_dict["plant_timer"]
+        self.tag = object_dict["tag"]
+        self.id = object_dict["id"]
+        self.color = object_dict["color"]
+        self.image = default.load_image(self.path)
+        self.apply_color(self.color)
 
     def updator(self, game):
         if self.is_solid:
@@ -78,7 +110,7 @@ class object(pygame.sprite.Sprite):
                     player.rect.topleft -= player.direction * player.speed
 
         if self.attacker != None and self.attacker.rect == None:
-            self.attacker == None
+            self.attacker = None
         if self.data.summoner != None:
             self.data.summoner.updator(game,self)
         if self.data.thrower != None:
@@ -119,7 +151,7 @@ class object(pygame.sprite.Sprite):
                             self.lootable_list.append(items.lootable(default.get_material(player.hand.item_data.item_name), 1))
                             player.hand.count -= 1
                     if self.data.recipe_list != None and not self.crafting_gui_open:
-                        for recipe in self.recipe_list:
+                        for recipe in self.data.recipe_list:
                             recipe.get_items_data()
                         player.inventory_display.open_inventory(game,player,player.inventory.inventory)
                         self.crafting_gui_user = player
@@ -162,22 +194,13 @@ class object(pygame.sprite.Sprite):
                 self.path = f'assets/objects/{self.name}{self.stage}'
                 self.apply_color(self.color)
             else:
-                self.path = f'assets/objects/None'
-                self.image = default.load_image(self.path)
-                self.rect.y = 1234567890
-                self.rect.x = 1234567890
-                self.rect = None
-                self.returner = False
-                self.rect_hitbox.x = 1234567890
-                self.rect_hitbox.y = 1234567890
-                self.rect_hitbox = None
                 return True
         if self.crafting_gui_open:
             if not self.crafting_gui_user.crafting_gui.is_open:
                 self.crafting_gui_open = False
                 self.crafting_gui_user = None
             else:
-                self.crafting_gui_user.crafting_gui.updator(self.recipe_list, game)
+                self.crafting_gui_user.crafting_gui.updator(self.data.recipe_list, game)
                 for event in self.crafting_gui_user.events:
                     if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                         self.crafting_gui_user.crafting_gui.close()
@@ -198,7 +221,7 @@ class object(pygame.sprite.Sprite):
         self.plant_timer = other.plant_timer
         self.stage = other.stage
         self.lootable_list = other.lootable_list
-        self.returner = other.returner
+
         self.health = other.health
         self.hitbox = other.hitbox
         self.tag = other.tag

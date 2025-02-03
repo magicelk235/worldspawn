@@ -1,7 +1,5 @@
 import sys,random,pygame,os,items,entities,objects,math,gif_pygame,projectiles,pickle,json,struct,copy
 from heapq import heappush, heappop
-from ipaddress import ip_address
-
 
 def get_pressed_key_names(key_states):
     """
@@ -758,11 +756,7 @@ def get_entity(name):
         entities.entity_data("swordman", 14, items.lootable(get_material("iron_sword"), 1, 0.75), "N", 1, 2),
         entities.entity_data("lumberjack", 14, items.lootable(get_material("iron_axe"), 1, 0.75), "N", 3, 4),
         entities.entity_data("farmer", 10, items.lootable(get_material("iron_axe"), 1, 0.75), "N", 2, 3, -1,
-                             trade_list=[recipe(items.inventory_item(get_material("bread"), 5),
-                                                items.inventory_item(get_material("crystal"), 3)),
-                                         recipe(items.inventory_item(get_material("crystal"), 5), items.inventory_item(
-                                             get_material(random.choice(["carrot", "pumpkin", "potato", "tomato"])),
-                                             10))], ignore_solid=False),
+                             trade_list=[recipe(items.inventory_item(get_material("bread"), 5),items.inventory_item(get_material("crystal"), 3)),recipe(items.inventory_item(get_material("crystal"), 5), items.inventory_item(get_material(random.choice(["carrot", "pumpkin", "potato", "tomato"])),10))], ignore_solid=False),
         entities.entity_data("blacksmith", 10, items.lootable(get_material("iron_sword"), 1, 0.75), "N", 1, 2, -1,
                              trade_list=[recipe(items.inventory_item(get_material("silver_sword"), 1),
                                                 items.inventory_item(get_material("crystal"), 5))], ignore_solid=False),

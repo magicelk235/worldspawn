@@ -27,7 +27,6 @@ class projectile(pygame.sprite.Sprite):
 
     def close(self,game):
         if self.data.return_to_attacker:
-            self.attacker.rect
             try:
                 if not self.attacker.inventory.add_item(default.get_material(self.data.name),1):
                     raise Exception("cant")
