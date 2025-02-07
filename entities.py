@@ -1,4 +1,4 @@
-import gif_pygame, pygame, random,items,gui,default,math,objects,projectiles,numpy,pickle
+import gif_pygame, pygame, random,items,gui,default,math,objects,projectiles,pickle
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos, game):
@@ -42,19 +42,20 @@ class Player(pygame.sprite.Sprite):
         self.inventory.add_item(default.get_material('iron_horse'), 1)
         self.inventory.add_item(default.get_material('phoenix_feather'), 1)
         self.inventory_display = gui.inventory(game,player=self)
+        self.attack_c_text = gui.text(self.hotbar.rect.center+pygame.math.Vector2(100,0),13,self.attack_c,game.camera_group,player=self)
 
     def from_dict(self,path,id):
-        with open(f"{path}/players/{id}.npy","rb") as f:
+        with open(f"{path}/players/{id}.pkl","rb") as f:
             player_dict = pickle.load(f)
             self.rect = player_dict["rect"]
             self.id = id
             self.health = player_dict["health"]
-            self.inventory = player_dict["inventory"]
+            self.inventory.inventory = player_dict["inventory"]
 
 
 
     def to_dict(self):
-        return {"id": self.id,"rect":self.rect,"inventory":self.inventory,"health":self.health}
+        return {"id": self.id,"rect":self.rect,"inventory":self.inventory.inventory,"health":self.health}
 
     def reset_modifiers(self):
         self.max_health = 10
@@ -75,7 +76,7 @@ class Player(pygame.sprite.Sprite):
         # render
         self.render.x = self.rect.x - 600
         self.render.y = self.rect.y - 400
-
+        self.attack_c_text.rect.center = self.hotbar.rect.center+pygame.math.Vector2(100,0)
         # inventory check
         self.hotbar.updator()
 
@@ -182,7 +183,24 @@ class Player(pygame.sprite.Sprite):
             for event in self.events:
                 if self.hand.item_data.event != None:
                     exec(self.hand.item_data.event,{},{"self":self,"game":game,"event":event})
+
+                if "_sword" in str(self.hand.item_data.tool_type) and self.attack_c == self.attack_cooldown and event.type == pygame.MOUSEBUTTONDOWN:
+
+                    if event.button == 1:
+
+                        for player in game.players:
+
+                            if player == self:
+
+                                continue
+                            if self.block_selector.rect != None and player.rect.colliderect(self.block_selector.rect):
+
+                                player.apply_damage(self.damage, game, self)
+                                self.attack_c = 0
+                                break
                 if event.type == pygame.KEYDOWN:
+
+
                     if event.key == pygame.K_e and self.action != "roll":
                         self.direction.x = 0
                         self.direction.y = 0
@@ -199,8 +217,11 @@ class Player(pygame.sprite.Sprite):
                     if self.roll_c < 1:
                         self.roll_c += 1
                 if event.type == game.TIMER_EVENT:
-                    if self.attack_cooldown >= self.attack_c:
+                    if self.attack_cooldown != self.attack_c:
+                        self.attack_cooldown = default.round_dec(self.attack_cooldown)
                         self.attack_c += 0.1
+
+                        self.attack_c_text.set_text(default.round_dec(self.attack_cooldown-self.attack_c))
 
 
     def updator(self,game):
@@ -228,6 +249,7 @@ class Player(pygame.sprite.Sprite):
 
             self.hotbar.rect.y += self.speed * self.direction.y
             self.hotbar.rect.x += self.speed * self.direction.x
+            self.attack_c_text.rect.topleft += self.speed * self.direction
             if self.hotbar.selector != None and self.hotbar.selector.rect != None:
                 self.hotbar.selector.rect.y += self.speed * self.direction.y
                 self.hotbar.selector.rect.x += self.speed * self.direction.x
@@ -241,7 +263,7 @@ class Player(pygame.sprite.Sprite):
         self.hotbar.close()
         self.block_selector.close()
         self.crafting_gui.remove()
-        del self.inventory_display
+        self.inventory_display.close()
 
         self.image = None
 
@@ -350,7 +372,7 @@ class entity(pygame.sprite.Sprite):
         spawn_kill = False
         if self.mob_type == "B":
             for e in game.entities:
-                if e.mob_type == "B" and e.name == self.entity_data.name:
+                if e.mob_type == "B" and e.entity_data.name == self.entity_data.name:
                     self.despawn_time = 1
                     spawn_kill = True
 
@@ -443,7 +465,7 @@ class entity(pygame.sprite.Sprite):
                 for i in range(self.entity_data.kill_spawn.amount):
                     game.entities.append(entity(game, default.get_entity(self.entity_data.kill_spawn.name),(self.rect.x + random.randint(-50, 50), self.rect.y + random.randint(-50, 50))))
                     game.entities[-1].attacker = self.attacker
-            if self.entity_data.lootable_list != []:
+            if self.entity_data.lootable_list != [] and self.entity_data.lootable_list != [None]:
                 for i in range(len(self.entity_data.lootable_list)):
                     if random.random() < self.entity_data.lootable_list[i].chance:
                         game.drops.append(
@@ -453,7 +475,7 @@ class entity(pygame.sprite.Sprite):
                 self.stop_riding()   
             # soul drop check
             
-            if isinstance(self.attacker,Player) and self.attacker.hand.item_data.item_name == "scythe":
+            if isinstance(self.attacker,Player) and "_soul" in str(self.attacker.hand.item_data.tool_type):
                 game.drops.append(items.item(game, self.rect.center, 1, default.get_material("soul")))
             return True
         try:
@@ -530,7 +552,7 @@ class entity(pygame.sprite.Sprite):
                             if self.saddled == True and self.entity_data.ride_data.needed_item != None:
                                 game.drops.append(items.item(game, self.rect.center, 1,default.get_material(self.entity_data.ride_data.needed_item)))
                                 self.saddled = False
-                            if "_sword" in str(player.hand.item_data.tool_type) and player.attack_c > player.attack_cooldown:
+                            if "_sword" in str(player.hand.item_data.tool_type) and player.attack_c == player.attack_cooldown:
                                 player.attack_c = 0
                                 self.apply_damage(player.damage,game,player)
                     elif event.button == 3 and player.block_selector.rect != None and self.rect.colliderect(player.block_selector.rect):

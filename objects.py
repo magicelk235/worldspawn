@@ -81,6 +81,7 @@ class object(pygame.sprite.Sprite):
         "hitbox":self.hitbox,
         "rect_hitbox":self.rect_hitbox,
         "plant_timer":self.plant_timer,
+        "is_solid":self.is_solid,
         "tag":self.tag,
         "id":self.id,
         "color":self.color
@@ -96,6 +97,7 @@ class object(pygame.sprite.Sprite):
         self.hitbox = object_dict["hitbox"]
         self.rect_hitbox = object_dict["rect_hitbox"]
         self.plant_timer = object_dict["plant_timer"]
+        self.is_solid = object_dict["is_solid"]
         self.tag = object_dict["tag"]
         self.id = object_dict["id"]
         self.color = object_dict["color"]
@@ -136,7 +138,7 @@ class object(pygame.sprite.Sprite):
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.health != None:
                         if player.block_selector.rect != None and self.rect.colliderect(player.block_selector.rect):
-                            if self.data.needed_item == None or (f"_{self.data.needed_item.item_name}" in str(player.hand.item_data.tool_type) and player.damage >= self.data.needed_item.min_damage) and player.attack_c > player.attack_cooldown:
+                            if self.data.needed_item == None or (f"_{self.data.needed_item.item_name}" in str(player.hand.item_data.tool_type) and player.damage >= self.data.needed_item.min_damage) and player.attack_c == player.attack_cooldown:
                                 if not self.health <= 0:
                                     player.attack_c = 0
                                     self.apply_damage(player.damage,game,player)
@@ -271,6 +273,30 @@ class cave(pygame.sprite.Sprite):
         for i in range(self.max_ores):
             objects.append(object(game, (99999, 99999), default.get_object(self.ore_name), self.id))
         self.player_in = False
+
+    def to_dict(self):
+        return {
+            "path":self.path,
+            "rect":self.rect,
+            "org_pos":self.org_pos,
+            "cave_pos":self.cave_pos,
+            "id":self.id,
+            "ore_name":self.ore_name,
+            "max_ores":self.max_ores,
+            "caves_cooldown":self.caves_cooldown,
+            "player_in":self.player_in,
+        }
+
+    def from_dict(self,cave_dict):
+        self.path = cave_dict["path"]
+        self.rect = cave_dict["rect"]
+        self.org_pos = cave_dict["org_pos"]
+        self.cave_pos = cave_dict["cave_pos"]
+        self.id = cave_dict["id"]
+        self.ore_name = cave_dict["ore_name"]
+        self.max_ores = cave_dict["max_ores"]
+        self.caves_cooldown = cave_dict["caves_cooldown"]
+        self.player_in = cave_dict["player_in"]
 
 
     def updator(self,game):

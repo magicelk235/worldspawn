@@ -1,9 +1,11 @@
-import socket,numpy,pygame,gui,random,events,default,entities,objects,items,threading
+import socket,pygame,gui,random,events,default,entities,objects,items,threading,pickle,os
 
 class server:
     def __init__(self,path):
         self.port = 55555
         self.lock = threading.Lock()
+        self.path = path
+        self.banned_players = []
 
         self.game_running = True
         pygame.init()
@@ -14,10 +16,10 @@ class server:
         pygame.display.set_mode((800, 400), pygame.SCALED | pygame.RESIZABLE)
         self.game_started = False
         self.remove_player_list = []
-        pygame.display.set_caption("WorldSpawn")
+        self.new_players = []
+        pygame.display.set_caption(f"WorldSpawn Code:{default.encrypt(self.get_local_ip())}")
         pygame.display.set_icon(pygame.image.load(default.resource_path("assets/gui/world_icon.png")))
         self.players = [entities.Player((3001, 3008), self)]
-
 
         self.owner = self.players[0]
         self.update_data = []
@@ -29,6 +31,20 @@ class server:
         self.drops = []
         self.events = []
         self.projectiles = []
+        self.events.append(events.event(self, events.event_data(5 * 60, 2.5 * 60, "night", "night",
+                                                                ["zombie", "skeleton", "troll", "ogre", "fungal",
+                                                                 "cyclops", "caveman", "witch", "stone_golem"])))
+        self.events.append(events.event(self, events.event_data(20 * 60, 2.5 * 60, "goblin_raid", "goblin_gas",
+                                                                ["goblin", "goblin_witch", "goblin_archer",
+                                                                 "goblin_spikeball", "goblin_wolf_rider"],
+                                                                summon_delay=4)))
+        self.events.append(events.event(self, events.event_data(10 * 60, 2.5 * 60, "rain", "rain",
+                                                                ["water_golem", "tornado", "water_golem_mini",
+                                                                 "tornado_mini"], summon_delay=6)))
+        try:
+            self.recover()
+        except:
+            self.world_gen()
 
     def get_local_ip(self):
         try:
@@ -40,46 +56,72 @@ class server:
         except:
             return "127.0.0.1"
 
+    def close(self):
+        events_list = []
+        for event in self.events:
+            events_list.append(event.to_dict())
+        with open(f"{self.path}/events.pkl","wb") as file:
+            pickle.dump(events_list,file)
+
+        entities_list = []
+        for entity in self.entities:
+            entities_list.append(entity.to_dict())
+        with open(f"{self.path}/entities.pkl","wb") as file:
+            pickle.dump(entities_list,file)
+
+        objects_list = []
+        for object in self.objects:
+            objects_list.append(object.to_dict())
+        with open(f"{self.path}/objects.pkl", "wb") as file:
+            pickle.dump(objects_list, file)
+
+        caves_list = []
+        for cave in self.caves:
+            caves_list.append(cave.to_dict())
+        with open(f"{self.path}/caves.pkl", "wb") as file:
+            pickle.dump(caves_list, file)
+
+        if not os.path.exists(f"{self.path}/players"):
+            os.mkdir(f"{self.path}/players")
+        for player in self.players:
+            player_data = player.to_dict()
+            with open(f"{self.path}/players/{player.id}.pkl", "wb") as file:
+                pickle.dump(player_data, file)
+
+        server_data = [self.banned_players,self.owner.id]
+        with open(f"{self.path}/server_data.pkl", "wb") as file:
+            pickle.dump(server_data, file)
+
     def handle_client(self,conn, addr):
         print(f"New connection: {addr}")
-        # id = conn.recv(1024).decode()
-        # played_before = False
-        # for player in self.players:
-        #     if player.id == id:
-        #         played_before = True
-        #         break
-        self.players.append(entities.Player((3001,3008),self))
-        # self.players[-1] = id
-        # if played_before:
-        #     self.players[-1].load_from_file(self.path,id)
-        player = self.players[-1]
+        id = default.recv_msg(conn)
+        self.new_players.append(id)
 
-        # try:
-        while True:
-            # Receive data from client
-            data = default.recv_msg(conn)
-            if not data:
-                raise Exception("no data received from client")
-            data = default.unserialize_pygame_inputs(data)
-            self.update_data.append([player]+data)
-            send_data = [self.camera_group.to_dict(player),{"rect":player.rect,"image":default.to_bytes(player.image),"size":player.image.get_size()}]
-            default.send_msg(conn,send_data)
-        # except Exception as e:
-        #     print(e)
-        #     print(f"Connection lost: {addr}")
-        #     conn.close()
-        #     self.remove_player_list.append(player)
-
-    def close(self):
-        self.camera_group.close()
+        player = None
+        try:
+            while True:
+                if player == None:
+                    player = default.get_player(self.players,id)
+                else:
+                    data = default.recv_msg(conn)
+                    if not data:
+                        raise Exception("no data received from client")
+                    data = default.unserialize_pygame_inputs(data)
+                    self.update_data.append([player]+data)
+                    send_data = [self.camera_group.to_dict(player),{"rect":player.rect,"image":default.to_bytes(player.image),"size":player.image.get_size()}]
+                    default.send_msg(conn,send_data)
+        except Exception as e:
+            print(e)
+            print(f"Connection lost: {addr}")
+            conn.close()
+            self.remove_player_list.append(player)
 
     def world_gen(self):
-        self.events.append(events.event(self,events.event_data(5*60,2.5*60,"night","night",["zombie", "skeleton", "troll", "ogre", "fungal", "cyclops","caveman","witch","stone_golem"])))
-        self.events.append(events.event(self,events.event_data(20*60,2.5*60,"goblin_raid","goblin_gas",["goblin", "goblin_witch", "goblin_archer", "goblin_spikeball", "goblin_wolf_rider"],summon_delay=4)))
-        self.events.append(events.event(self,events.event_data(10*60,2.5*60,"rain","rain",["water_golem", "tornado", "water_golem_mini", "tornado_mini"],summon_delay=6)))
+
         self.objects.append(objects.object(self, (2954, 2970), default.get_object("spawn0")))
         used_places = []
         for i in range(400):
+            print(i)
             while True:
                 random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
                 if random_place not in used_places:
@@ -129,6 +171,7 @@ class server:
                             used_places.append(random_place)
                             self.objects.append(objects.object(self, random_place, default.get_object(name)))
                             break
+
         for block in self.objects:
             if block.data.plant_data != None:
                 block.stage = block.data.plant_data.max_stage
@@ -145,57 +188,46 @@ class server:
         self.objects.append(objects.object(self, (6003, -529), objects.object_data("border_y", None, None, None, None, True)))
 
     def recover(self):
-        if self.objects == self.objects:
-            new_blocks = numpy.load(f"{self.path}/blocks.npy", None, True)
+
+        with open(f"{self.path}/server_data.pkl","rb") as file:
+            server_data = pickle.load(file)
+            self.banned_players = server_data[0]
+            self.players[-1].from_dict(self.path,server_data[1])
+
+        with open(f"{self.path}/objects.pkl","rb") as file:
+            new_blocks = pickle.load(file)
             if len(self.objects) < len(new_blocks):
                 for i in range(len(new_blocks) - len(self.objects)):
                     self.objects.append(objects.object(self, (10, 10), default.get_object("rock")))
             for i in range(len(new_blocks)):
-                if new_blocks[i] != None:
-                    self.objects[i].copy(new_blocks[i], self)
-                else:
-                    self.objects[i] = new_blocks[i]
+                self.objects[i].from_dict(new_blocks[i])
 
-        if self.entities == self.entities:
-            new_entities = numpy.load(f"{self.path}/entities.npy", None, True)
+        with open(f"{self.path}/entities.pkl","rb") as file:
+            new_entities = pickle.load(file)
             if len(self.entities) < len(new_entities):
                 for i in range(len(new_entities) - len(self.entities)):
                     self.entities.append(entities.entity(self, default.get_entity("cow"), (10, 10)))
             for i in range(len(new_entities)):
-                if new_entities[i] != None:
-                    self.entities[i].copy(new_entities[i], self)
-                else:
-                    self.entities[i] = None
-        if self.caves == self.caves:
-            new_caves = numpy.load(f"{self.path}/caves.npy", None, True)
+                self.entities[i].from_dict(new_entities[i])
 
+        with open(f"{self.path}/caves.pkl","rb") as file:
+            new_caves = pickle.load(file)
             if len(self.caves) < len(new_caves):
                 for i in range(len(new_caves) - len(self.caves)):
-                    self.caves.append(objects.cave((10, 10), self, "coal_ore", 0, self.objects))
+                    self.caves.append(objects.cave((999999,99999),self,"rock",15,self.objects))
             for i in range(len(new_caves)):
-                self.caves[i].copy(new_caves[i], self.camera_group)
-        if self.drops == self.drops:
-            new_drops = numpy.load(f"{self.path}/drops.npy", None, True)
-            if len(self.drops) < len(new_drops):
-                for i in range(len(new_drops) - len(self.drops)):
-                    self.drops.append(items.item(self, (10, 10), 1, default.get_material("wood")))
-            for i in range(len(new_drops)):
-                self.drops[i].copy(new_drops[i])
+                self.caves[i].from_dict(new_caves[i])
 
-        if self.events == self.events:
-            new_events = numpy.load(f"{self.path}/events.npy", None, True)
-            if len(self.events) < len(new_events):
-                for i in range(len(new_events) - len(self.events)):
-                    self.events.append(events.event(self, events.event_data(1, 1, "beer")))
+        with open(f"{self.path}/events.pkl","rb") as file:
+            new_events = pickle.load(file)
             for i in range(len(new_events)):
-                self.events[i].copy(new_events[i])
+                self.events[i].from_dict(new_events[i])
 
     def main(self):
         with self.lock:
             threading.Thread(target=self.start_server).start()
-
-            self.world_gen()
             while self.game_running:
+
                 self.owner.mouse = pygame.mouse.get_pos()
                 self.owner.events = pygame.event.get()
                 self.event_list = self.owner.events
@@ -205,23 +237,35 @@ class server:
                     data[0].keys = data[2]
                     data[0].events = data[1]
                     data[0].mouse = data[3]
+                for id in self.new_players:
+                    self.players.append(entities.Player((3001, 3008), self))
+                    if os.path.exists(f"{self.path}/players/{id}.pkl"):
+                        self.players[-1].from_dict(self.path, id)
+                    self.players[-1].id = id
+                    self.new_players.remove(id)
+
                 for event in self.owner.events:
                     if event.type == pygame.QUIT:
                         self.game_running = False
-                
+
                 self.game_update()
                 try:
-                    self.camera_group.custom_draw(self.owner)
+                    self.camera_group.custom_draw(self.owner,True,ignore_render=True)
                 except:
                     pass
                 pygame.display.flip()
                 for player in self.remove_player_list:
                     player.gui_open = False
                     self.remove_player_list.remove(player)
-                    player.close()
+                    if not os.path.exists(f"{self.path}/players"):
+                        os.mkdir(f"{self.path}/players")
+                    with open(f"{self.path}/players/{player.id}.pkl", "wb") as f:
+                        pickle.dump(player.to_dict(),f)
+                    player.to_dict()
                     self.camera_group.remove(player)
                     self.players.remove(player)
-
+                    del player
+            self.close()
             pygame.quit()
 
     def start_server(self):
@@ -275,6 +319,3 @@ class server:
 
         for player in self.players:
             player.updator(self)
-
-test = server("test")
-test.main()

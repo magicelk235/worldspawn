@@ -1,6 +1,6 @@
-import gif_pygame,default,entities,objects,gui,items,math,pygame,os,copy
+import shutil
 
-
+import default,objects,items,math,pygame,os,copy,gif_pygame
 
 class display_sprite(pygame.sprite.Sprite):
     def __init__(self,camera_group,rect,image,image_in_bytes):
@@ -220,7 +220,6 @@ class gui_item(pygame.sprite.Sprite):
             self.text.rect.x = pos[0] + 18
             self.text.rect.y = pos[1] + 18
 
-
 class crafting_gui(pygame.sprite.Sprite):
     def __init__(self, game,player):
         super().__init__(game.camera_group)
@@ -388,7 +387,7 @@ class CameraGroup(pygame.sprite.Group):
             sprite.image = default.to_bytes(sprite.image)
 
 
-    def player_load(self,player,client,ignore_render=False,clear_trash=True):
+    def player_load(self,player,client,ignore_render=False,clear_trash=True,always_update=False):
         sprite_list = []
         load_object_start = [
             "wooden_floor",
@@ -448,9 +447,9 @@ class CameraGroup(pygame.sprite.Group):
         for sprite in self.sprites():
             if sprite.rect is not None:
 
-                if isinstance(sprite.image,gif_pygame.GIFPygame) and ignore_render:
+                if isinstance(sprite.image,gif_pygame.GIFPygame) and always_update:
                     sprite.image._animate()
-                if player.render.colliderect(sprite.rect) :
+                if ignore_render or player.render.colliderect(sprite.rect) :
                     if (str(sprite) == "<object Sprite(in 1 groups)>" and sprite.name in load_object_start) or isinstance(sprite, objects.cave):
                         offset = sprite.rect.topleft - player_offset + self.internal_offset
                         sprite_list.append({"sprite":sprite,"location":offset})
@@ -460,7 +459,7 @@ class CameraGroup(pygame.sprite.Group):
                 del sprite
 
         for sprite in sorted(self.sprites(), key=lambda sprite: sprite.rect.centery if sprite.rect else float('-inf')):
-            if sprite.rect != None and player.render.colliderect(sprite.rect):
+            if sprite.rect != None and (ignore_render or player.render.colliderect(sprite.rect)):
                 load_object_check = False
                 if str(sprite) == "<object Sprite(in 1 groups)>" and sprite.name in load_object_start:
                     load_object_check = True
@@ -469,26 +468,28 @@ class CameraGroup(pygame.sprite.Group):
                     offset = sprite.rect.topleft - player_offset + self.internal_offset
                     sprite_list.append({"sprite": sprite, "location": offset})
         for sprite in self.sprites():
-            if sprite.rect != None and player.render.colliderect(sprite.rect):
+            if sprite.rect != None and (ignore_render or player.render.colliderect(sprite.rect)):
                 if str(sprite) in load_middle:
                     if str(sprite) in one_player_load and client:
                         if sprite.player == player:
                             offset = sprite.rect.topleft - player_offset + self.internal_offset
                             sprite_list.append({"sprite": sprite, "location": offset})
-                    else:
+                    elif not client:
                         offset = sprite.rect.topleft - player_offset + self.internal_offset
                         sprite_list.append({"sprite": sprite, "location": offset})
 
         for sprite in self.sprites():
-            if sprite.rect != None and player.render.colliderect(sprite.rect):
+            if sprite.rect != None and (ignore_render or player.render.colliderect(sprite.rect)):
                 if str(sprite) in load_end:
                     if str(sprite) in one_player_load and client:
                         if sprite.player == player:
                             offset = sprite.rect.topleft - player_offset + self.internal_offset
                             sprite_list.append({"sprite": sprite, "location": offset})
-                    else:
+                    elif not client:
                         offset = sprite.rect.topleft - player_offset + self.internal_offset
                         sprite_list.append({"sprite": sprite, "location": offset})
+
+
         for sprite in self.sprites():
             if str(sprite) in load_theme:
                 sprite_list.append({"sprite": sprite, "location": self.internal_offset})
@@ -497,13 +498,14 @@ class CameraGroup(pygame.sprite.Group):
     def to_dict(self,player):
         sprite_list = []
         for sprite in self.player_load(player,True,clear_trash=False):
-            if sprite == player:
+            if sprite["sprite"].rect == None or sprite["sprite"].image == None:
                 continue
-            image = default.to_bytes(copy.deepcopy(sprite["sprite"].image))
-            if image is None:
-                continue
-            sprite_list.append({"rect":copy.deepcopy(sprite["sprite"].rect),"image":image,"size":sprite["sprite"].image.get_size()})
+            image_size = sprite["sprite"].image.get_size()
+            image = default.to_bytes(copy.copy(sprite["sprite"].image))
+            sprite_list.append({"rect":copy.deepcopy(sprite["sprite"].rect),"image":image,"size":image_size})
             sprite_list[-1]["rect"].topleft = sprite["location"]
+
+
         return sprite_list
 
     def from_dict(self, sprite_list):
@@ -514,15 +516,15 @@ class CameraGroup(pygame.sprite.Group):
             display_sprite(self, sprite_rect, sprite_image, sprite["image"])
 
     def normal_draw(self,player):
-        self.internal_surf.fill('#2c425c')
+        self.internal_surf.fill('#191716')
 
         self.center_target_camera(player)
 
         ground_offset = self.ground_rect.topleft - self.offset + self.internal_offset
         self.internal_surf.blit(self.ground_surf, ground_offset)
-        if self.cave_ground_rect1.colliderect(player.render):
-            cave_ground_offset1 = self.cave_ground_rect1.topleft - self.offset + self.internal_offset
-            self.internal_surf.blit(self.cave_ground_surf1, cave_ground_offset1)
+
+        cave_ground_offset1 = self.cave_ground_rect1.topleft - self.offset + self.internal_offset
+        self.internal_surf.blit(self.cave_ground_surf1, cave_ground_offset1)
         for sprite in self.sprites():
             default.display_image(sprite.image, self.internal_surf, sprite.rect)
 
@@ -531,92 +533,168 @@ class CameraGroup(pygame.sprite.Group):
         self.internal_surf.blit(self.cave_surf, cave_offset)
         scaled_surf = pygame.transform.scale(self.internal_surf, self.internal_surface_size_vector * self.zoom_scale)
         scaled_rect = scaled_surf.get_rect(center=(self.half_w, self.half_h))
-        self.internal_surf.fill('#2c425c')
+        self.internal_surf.fill('#191716')
 
         self.display_surface.blit(scaled_surf, scaled_rect)
 
-    def custom_draw(self, player):
-        self.internal_surf.fill('#2c425c')
+    def custom_draw(self, player,client=True,ignore_render=False):
+        self.internal_surf.fill('#191716')
 
         self.center_target_camera(player)
 
         ground_offset = self.ground_rect.topleft - self.offset + self.internal_offset
         self.internal_surf.blit(self.ground_surf,  ground_offset)
-        if self.cave_ground_rect1.colliderect(player.render):
-            cave_ground_offset1 = self.cave_ground_rect1.topleft - self.offset + self.internal_offset
-            self.internal_surf.blit(self.cave_ground_surf1, cave_ground_offset1)
-        for sprite in self.player_load(player,True,True):
+
+        cave_ground_offset1 = self.cave_ground_rect1.topleft - self.offset + self.internal_offset
+        self.internal_surf.blit(self.cave_ground_surf1, cave_ground_offset1)
+        for sprite in self.player_load(player,client,ignore_render,always_update=True):
             default.display_image(sprite["sprite"].image, self.internal_surf, sprite["location"])
 
         cave_offset = self.cave_rect.topleft - self.offset + self.internal_offset
         self.internal_surf.blit(self.cave_surf, cave_offset)
         scaled_surf = pygame.transform.scale(self.internal_surf, self.internal_surface_size_vector * self.zoom_scale)
         scaled_rect = scaled_surf.get_rect(center=(self.half_w, self.half_h))
-        self.internal_surf.fill('#2c425c')
+        self.internal_surf.fill('#191716')
         self.display_surface.blit(scaled_surf, scaled_rect)
 
 class world_menu_selector(pygame.sprite.Sprite):
-    def __init__(self,pos,game):
-        super().__init__(game.camera_group)
+    def __init__(self,pos,camera_group):
+        super().__init__(camera_group)
         self.image = default.load_image('assets/gui/world_selector')
         self.rect = self.image.get_rect(topleft=pos)
-
+        self.offset = 0
+        self.keyboard = None
         self.y = 0
 
-    def updator(self,event_list,world_menu):
-        for event in event_list:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    if self.y < 3:
-                        self.y += 1
-                elif event.key == pygame.K_UP:
-                    if self.y > 0:
-                        self.y -= 1
-                elif event.key == pygame.K_x:
-                    if world_menu.worlds_list[self.y] != "":
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/entities.npy")
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/blocks.npy")
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/caves.npy")
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/player.npy")
+    def updator(self,event_list,world_menu,camera_group):
+        if self.keyboard == None:
+            for event in event_list:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_DOWN:
+                        if self.y < 3:
+                            self.y += 1
+                        else:
+                            self.offset += 3
+                            self.y = 0
+                            world_menu.reset(self.offset,camera_group)
+                    elif event.key == pygame.K_UP:
+                        if self.y > 0:
+                            self.y -= 1
+                        elif self.offset != 0:
+                            self.offset -= 3
+                            self.y = 3
+                            world_menu.reset(self.offset, camera_group)
+                    elif event.key == pygame.K_x:
+                        try:
+                            shutil.rmtree(f"{world_menu.path}/{world_menu.worlds_list[self.y]}")
+                            world_menu.worlds_list.remove(world_menu.worlds_list[self.y])
+                            world_menu.reset(self.offset,camera_group)
 
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/drops.npy")
-                        os.remove(f"world/{world_menu.worlds_list[self.y]}/events.npy")
-
-
-
-                        world_menu.worlds_list[self.y] = ""
-                        world_menu.world_icons_list[self.y].delete()
-                        world_menu.world_icons_list[self.y] = ""
-                        world_menu.world_names_list[self.y].delete()
-                        world_menu.world_names_list[self.y] = ""
-                elif event.key == pygame.K_RETURN:
-                    if world_menu.worlds_list[self.y] == "":
-                        return f"world/world{self.y+1}"
-                    else:
-                        return f"world/{world_menu.worlds_list[self.y]}"
+                        except:
+                            pass
+                    elif event.key == pygame.K_RETURN:
+                        try:
+                            return f"{world_menu.path}/{world_menu.worlds_list[self.y+self.offset]}"
+                        except:
+                            if "host" in world_menu.path:
+                                self.keyboard = keyboard(camera_group,world_menu.rect.bottomleft+pygame.math.Vector2(0,0),"enter world name")
+                            else:
+                                self.keyboard = keyboard(camera_group, world_menu.rect.bottomleft+pygame.math.Vector2(0,0), "enter joining code")
+        else:
+            entered_text = self.keyboard.update(event_list)
+            try:
+                if entered_text != None:
+                    os.mkdir(f"{world_menu.path}/{entered_text}")
+                    return f"{world_menu.path}/{entered_text}"
+            except:
+                self.keyboard.set_text("name/code already used")
         self.rect = self.image.get_rect(topleft=(world_menu.rect.x + 14,world_menu.rect.y + 13 + (self.y * 42)))
 
     def delete(self):
         self.rect = None
         self.image = None
 
+class world_menu(pygame.sprite.Sprite):
+    def __init__(self, pos, camera_group, extension):
+        super().__init__(camera_group)
+        if not os.path.exists("data"):
+            os.mkdir("data")
+            os.mkdir("data/host")
+            os.mkdir("data/join")
+
+        self.image = default.load_image("assets/gui/world_list")
+        self.rect = self.image.get_rect(topleft=pos)
+        self.render = pygame.Rect(self.rect.x, self.rect.y, 780, 400)
+
+        self.path = f"data/{extension}"
+        self.worlds_list = os.listdir(self.path)
+
+        self.world_icons_list = [None,None,None,None]
+        self.world_names_list = [None,None,None,None]
+        self.reset(0,camera_group)
+
+    def reset(self,offset,camera_group):
+        for i in range(1, 5):
+            try:
+                if self.world_names_list[i-1] != None:
+                    camera_group.remove(self.world_names_list[i-1])
+                if self.world_icons_list[i-1] != None:
+                    camera_group.remove(self.world_icons_list[i-1])
+                self.world_names_list[i - 1] = text((self.rect.x + 56, self.rect.y + 18 + i * 42 - 42), 15,self.worlds_list[offset+i-1], camera_group)
+                self.world_icons_list[i - 1] = world_icon((self.rect.x + 20, self.rect.y + 16 + i * 42 - 42),camera_group)
+            except:
+                pass
+
+
+    def delete(self):
+        for i in range(4):
+            if self.worlds_list[i] != None:
+                self.world_icons_list[i].delete()
+                self.world_names_list[i].delete()
+        self.rect = None
+        self.image = None
+
+
+class world_icon(pygame.sprite.Sprite):
+    def __init__(self, pos, camera_group):
+        super().__init__(camera_group)
+        self.image = default.load_image("assets/gui/world_icon")
+        self.rect = self.image.get_rect(topleft=pos)
+
+    def delete(self):
+        self.rect = None
+        self.image = None
+
+
+class textbox(pygame.sprite.Sprite):
+    def __init__(self,pos,camera_group):
+        super().__init__(camera_group)
+        self.image = default.load_image("assets/gui/textbox")
+        self.rect = self.image.get_rect(topleft=pos)
 
 class keyboard:
-    def __init__(self,camera_group,pos):
-        self.text = ""
-        self.text_object = text(pos,10,text,camera_group)
+    def __init__(self,camera_group,pos,default_text=""):
+        self.text = default_text
+        self.textbox = textbox(pos,camera_group)
+        self.text_object = text(pos+pygame.math.Vector2(20,28),13,self.text,camera_group)
+
+    def set_text(self,text):
+        self.text_object.set_text(text)
 
     def update(self,event_list):
         for event in event_list:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    return True
+                    return self.text
                 elif event.key == pygame.K_BACKSPACE:
                     self.text = self.text[:-1]
+                elif event.key == pygame.K_SPACE:
+                    self.text = self.text + " "
                 else:
                     key_name = pygame.key.name(event.key)
                     self.text = self.text + key_name
                 self.text_object.set_text(self.text)
+        return None
 
 class button:
     def __init__(self,x,y,w,h):
@@ -625,7 +703,7 @@ class button:
     def check(self,event_list):
         for event in event_list:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.rect.collidepoint(pygame.mouse.get_pos()):
+                if self.rect.collidepoint(pygame.mouse.get_pos()+pygame.math.Vector2(1678,1855)):
                     return True
         return False
     
@@ -637,51 +715,14 @@ class game_type_gui(pygame.sprite.Sprite):
         self.host_button = button(self.rect.x+15,self.rect.y+13,130,40)
         self.join_button = button(self.rect.x+15,self.rect.y+59,130,40)
 
-    def updator(self):
-        if self.host_button.check(pygame.event.get()):
+    def updator(self,events):
+        if self.host_button.check(events):
             return "host"
-        elif self.join_button.check(pygame.event.get()):
+        elif self.join_button.check(events):
             return "join"
         else:
             return None
-        
 
-class world_menu(pygame.sprite.Sprite):
-    def __init__(self,pos,camera_group):
-        super().__init__(camera_group)
-        if not os.path.exists("data"):
-            os.mkdir("data/host")
-            os.mkdir("data/local")
-        self.image = default.load_image("assets/gui/world_list")
-        self.rect = self.image.get_rect(topleft=pos)
-        self.render = pygame.Rect(self.rect.x, self.rect.y, 780, 400)
-        self.worlds_list = ["","","",""]
-        self.world_icons_list = ["","","",""]
-        self.world_names_list = ["","","",""]
-        for i in range(1,5):
-            if os.path.exists(f'world/world{i}/player.npy'):
-                self.world_icons_list[i-1] = world_icon((self.rect.x+20,self.rect.y+16 + i*42 - 42),camera_group)
-                self.world_names_list[i-1] = text((self.rect.x + 56,self.rect.y + 18 + i * 42 - 42),20,f"World {i}",camera_group)
-                self.worlds_list[i-1] = f"world{i}"
-
-    def delete(self):
-        for i in range(4):
-            if self.worlds_list[i] != "":
-                self.world_icons_list[i].delete()
-                self.world_names_list[i].delete()
-        self.rect = None
-        self.image = None
-
-class world_icon(pygame.sprite.Sprite):
-    def __init__(self,pos,camera_group):
-        super().__init__(camera_group)
-        self.image = default.load_image("assets/gui/world_icon")
-        self.rect = self.image.get_rect(topleft=pos)
-
-    def delete(self):
-        self.rect = None
-        self.image = None
-        
 class text(pygame.sprite.Sprite):
     def __init__(self,pos,size,text,camera_group,color=(0,0,0),normal_font=False,player=None):
         super().__init__(camera_group)
@@ -694,7 +735,7 @@ class text(pygame.sprite.Sprite):
             font = pygame.font.Font(None, size)
         else:
             font = pygame.font.Font(default.resource_path('assets/fonts/font.ttf'), size)
-        self.image = font.render(self.text, normal_font, self.color)
+        self.image = font.render(str(self.text), normal_font, self.color)
         self.rect = self.image.get_rect(topleft=pos)
 
     def updator(self):
@@ -702,7 +743,8 @@ class text(pygame.sprite.Sprite):
             font = pygame.font.Font(None, self.size)
         else:
             font = pygame.font.Font(default.resource_path('assets/fonts/font.ttf'), self.size)
-        self.image = font.render(self.text, False, self.color)
+
+        self.image = font.render(str(self.text), False, self.color)
 
     def set_text(self,text):
         self.text = text
@@ -868,7 +910,7 @@ class hotbar(pygame.sprite.Sprite):
         self.player = player
         self.rect = self.image.get_rect(topleft=(player.rect.x - 90, player.rect.y + 170))
         self.selector = hotbar_selector((self.rect.x, self.rect.y), game, 0, player)
-        self.display_array = [gui.gui_item((999999,999999),0,None,game,self.player) for _ in range(5)]
+        self.display_array = [gui_item((999999,999999),0,None,game,self.player) for _ in range(5)]
 
     def close(self):
         for x in range(5):
@@ -891,7 +933,7 @@ class hotbar(pygame.sprite.Sprite):
     def open_hotbar(self,game):
         if self.selector != None:
             self.selector.delete()
-        self.selector = hotbar_selector((self.rect.x, self.rect.y), game, 0, player)
+        self.selector = hotbar_selector((self.rect.x, self.rect.y), game, 0, self.player)
         self.path = 'assets/gui/hotbar'
         self.image = default.load_image(self.path)
         self.rect = self.image.get_rect(topleft=(game.player.rect.x - 90, game.player.rect.y + 170))

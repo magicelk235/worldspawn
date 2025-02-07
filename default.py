@@ -1,4 +1,4 @@
-import sys,random,pygame,os,items,entities,objects,math,gif_pygame,projectiles,pickle,json,struct,copy
+import sys,random,pygame,os,items,entities,objects,math,gif_pygame,projectiles,pickle,struct,copy
 from heapq import heappush, heappop
 
 def get_pressed_key_names(key_states):
@@ -122,24 +122,28 @@ def unserialize_pygame_inputs(serialized_inputs):
     return [reconstructed_events, key_states, mouse_pos]
 
 
-
-
 def to_bytes(image):
 
     if image != None:
+
         try:
-            return pygame.image.tobytes(image, "RGBA")
+
+            return pygame.image.tobytes(copy.deepcopy(image), "RGBA")
+
         except:
             new_image = copy.deepcopy(image)
             for i in range(len(image.frames)):
+
                 new_image.frames[i][0] = pygame.image.tobytes(image.frames[i][0],"RGBA")
+
             return new_image
+
     return None
 
 def from_bytes(image,size):
 
     try:
-        return pygame.image.frombytes(image,size, "RGBA")
+        return pygame.image.frombytes(copy.deepcopy(image),size, "RGBA")
     except:
         try:
             new_image = copy.deepcopy(image)
@@ -148,7 +152,7 @@ def from_bytes(image,size):
 
             return new_image
         except:
-            return load_image(r"assets\gui\failed")
+            return load_image(r"assets\gui\None")
     
 def is_image_bytes(image):
     try:
@@ -543,8 +547,8 @@ def get_material(name):
         items.item_data("golden_chain", 1, [items.modifiyer("max_health", 14, True, False)]),
         items.item_data("mega_shield", 1, [items.modifiyer("speed", -4,choose_bigger=False), items.modifiyer("shield", 1.5, True)]),
         items.item_data("magic_book",1,[items.modifiyer("attack_cooldown",1.3)],event=projectile_item_template(["soul"],3,["magic_book"],0)),
-        items.item_data("scythe", 1, [items.modifiyer("damage", 3)], tool_type="_sword"),
-        items.item_data("wings",1,modifiyers=[items.modifiyer("speed",3,False,False),items.modifiyer("attack_cooldown",-0.5,False,False,percent=True)]),
+        items.item_data("scythe", 1, [items.modifiyer("damage", 3)], tool_type="_sword_soul"),
+        items.item_data("wings",1,modifiyers=[items.modifiyer("speed",3,False,False),items.modifiyer("attack_cooldown",-0.2,False,False,percent=True)]),
         items.item_data("genie_lamp", 1, event=entity_item_template("genie_friendly")),
         items.item_data("trident", 1,modifiyers=[items.modifiyer("damage",3),items.modifiyer("attack_cooldown",0.5)], event=projectile_item_template(["trident"],1,["trident"],1),tool_type="_sword"),
 
@@ -598,30 +602,47 @@ def get_material(name):
         items.item_data("wooden_axe", 1, tool_type="_axe"),
         items.item_data("wooden_hoe", 1, tool_type="_hoe"),
         items.item_data("wooden_chestplate", 1, [items.modifiyer("shield", 0.05, True, False)]),
+        items.item_data("wooden_dagger", 1,[items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
+        items.item_data("wooden_spear", 1,[items.modifiyer("damage", 1),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+
+        items.item_data("wooden_hammer", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+
 
         items.item_data("copper_sword", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
         items.item_data("copper_pickaxe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
         items.item_data("copper_axe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
         items.item_data("copper_hoe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
         items.item_data("copper_chestplate", 1, [items.modifiyer("shield", 0.1, True, False)]),
+        items.item_data("copper_dagger", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
+        items.item_data("copper_spear", 1,[items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+        items.item_data("copper_hammer", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
 
         items.item_data("iron_sword", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
         items.item_data("iron_pickaxe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
         items.item_data("iron_axe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
         items.item_data("iron_hoe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
         items.item_data("iron_chestplate", 1, [items.modifiyer("shield", 0.15, True, False)]),
+        items.item_data("iron_dagger", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
+        items.item_data("iron_spear", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+        items.item_data("iron_hammer", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
 
         items.item_data("silver_sword", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
         items.item_data("silver_pickaxe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
         items.item_data("silver_axe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
         items.item_data("silver_hoe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
         items.item_data("silver_chestplate", 1, [items.modifiyer("shield", 0.2, True, False)]),
+        items.item_data("silver_dagger", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
+        items.item_data("silver_spear", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+        items.item_data("silver_hammer", 1,[items.modifiyer("damage", 6),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
 
         items.item_data("gold_sword", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
         items.item_data("gold_pickaxe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
         items.item_data("gold_axe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
         items.item_data("gold_hoe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
         items.item_data("gold_chestplate", 1, [items.modifiyer("shield", 0.25, True, False)]),
+        items.item_data("gold_dagger", 1,[items.modifiyer("damage", 6),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
+        items.item_data("gold_spear", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+        items.item_data("gold_hammer", 1,[items.modifiyer("damage", 7),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
 
         items.item_data("phoenix_feather", 1,
                         [items.modifiyer("damage", 20, hand_needed=False), items.modifiyer("speed", 2, False)],
@@ -870,13 +891,19 @@ def get_object(name):
                [items.inventory_item("stick", 2), items.inventory_item("wood", 2)]),
         recipe(items.inventory_item("wooden_sword", 1),
                [items.inventory_item("stick", 2), items.inventory_item("wood", 2)]),
+        recipe(items.inventory_item("wooden_dagger", 1),
+               [items.inventory_item("stick", 1), items.inventory_item("wood", 2)]),
+        recipe(items.inventory_item("wooden_spear", 1),
+               [items.inventory_item("stick", 3), items.inventory_item("wood", 2)]),
+        recipe(items.inventory_item("wooden_hammer", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("wood", 5)]),
 
         recipe(items.inventory_item("wooden_chestplate", 1), [items.inventory_item("wood", 6)]),
 
         recipe(items.inventory_item("wooden_floor", 4), [items.inventory_item("wood", 4)]),
         recipe(items.inventory_item("rock_floor", 4), [items.inventory_item("rock", 4)]),
 
-        recipe(items.inventory_item("oven", 1), [items.inventory_item("rock", 8)]),
+        recipe(items.inventory_item("oven", 1), [items.inventory_item("rock", 8),items.inventory_item("coal", 4)]),
         recipe(items.inventory_item("string", 4), [items.inventory_item("silk", 1)]),
         recipe(items.inventory_item("anvil", 1),
                [items.inventory_item("copper_bar", 3), items.inventory_item("rock", 4)]),
@@ -953,6 +980,15 @@ def get_object(name):
         recipe(items.inventory_item("copper_sword", 1),
                [items.inventory_item("stick", 2), items.inventory_item("copper_bar", 2),
                 items.inventory_item("wooden_sword")]),
+        recipe(items.inventory_item("copper_dagger", 1),
+               [items.inventory_item("stick", 1), items.inventory_item("copper_bar", 2),
+                items.inventory_item("wooden_dagger")]),
+        recipe(items.inventory_item("copper_spear", 1),
+               [items.inventory_item("stick", 3), items.inventory_item("copper_bar", 2),
+                items.inventory_item("wooden_spear")]),
+        recipe(items.inventory_item("copper_hammer", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("copper_bar", 5),
+                items.inventory_item("wooden_hammer")]),
         recipe(items.inventory_item("copper_chestplate", 1),
                [items.inventory_item("copper_bar", 6), items.inventory_item("wooden_chestplate")]),
 
@@ -968,6 +1004,17 @@ def get_object(name):
         recipe(items.inventory_item("iron_sword", 1),
                [items.inventory_item("stick", 2), items.inventory_item("iron_bar", 2),
                 items.inventory_item("copper_sword")]),
+
+        recipe(items.inventory_item("iron_dagger", 1),
+               [items.inventory_item("stick", 1), items.inventory_item("iron_bar", 2),
+                items.inventory_item("copper_dagger")]),
+        recipe(items.inventory_item("iron_spear", 1),
+               [items.inventory_item("stick", 3), items.inventory_item("iron_bar", 2),
+                items.inventory_item("copper_spear")]),
+        recipe(items.inventory_item("iron_hammer", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("iron_bar", 5),
+                items.inventory_item("copper_hammer")]),
+
         recipe(items.inventory_item("iron_chestplate", 1),
                [items.inventory_item("iron_bar", 6), items.inventory_item("copper_chestplate")]),
 
@@ -983,6 +1030,17 @@ def get_object(name):
         recipe(items.inventory_item("silver_sword", 1),
                [items.inventory_item("stick", 2), items.inventory_item("silver_bar", 2),
                 items.inventory_item("iron_sword")]),
+
+        recipe(items.inventory_item("silver_dagger", 1),
+               [items.inventory_item("stick", 1), items.inventory_item("silver_bar", 2),
+                items.inventory_item("iron_dagger")]),
+        recipe(items.inventory_item("silver_spear", 1),
+               [items.inventory_item("stick", 3), items.inventory_item("silver_bar", 2),
+                items.inventory_item("iron_spear")]),
+        recipe(items.inventory_item("silver_hammer", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("silver_bar", 5),
+                items.inventory_item("silver_hammer")]),
+
         recipe(items.inventory_item("silver_chestplate", 1),
                [items.inventory_item("silver_bar", 6), items.inventory_item("iron_chestplate")]),
 
@@ -998,6 +1056,17 @@ def get_object(name):
         recipe(items.inventory_item("gold_sword", 1),
                [items.inventory_item("stick", 2), items.inventory_item("gold_bar", 2),
                 items.inventory_item("silver_sword")]),
+
+        recipe(items.inventory_item("gold_dagger", 1),
+               [items.inventory_item("stick", 1), items.inventory_item("gold_bar", 2),
+                items.inventory_item("silver_dagger")]),
+        recipe(items.inventory_item("gold_spear", 1),
+               [items.inventory_item("stick", 3), items.inventory_item("gold_bar", 2),
+                items.inventory_item("silver_spear")]),
+        recipe(items.inventory_item("gold_hammer", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("gold_bar", 5),
+                items.inventory_item("silver_hammer")]),
+
         recipe(items.inventory_item("gold_chestplate", 1),
                [items.inventory_item("gold_bar", 6), items.inventory_item("silver_chestplate")]),
     ]
@@ -1203,6 +1272,9 @@ def rotate(image,degree):
         return image
     except:
         return pygame.transform.rotate(image,degree)
+
+def round_dec(dec):
+    return int(dec*10)/10
 
 class recipe:
     def __init__(self,result,items):

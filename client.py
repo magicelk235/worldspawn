@@ -1,18 +1,24 @@
-import socket,default,json,gui
+import socket,default,json,gui,uuid
 import pygame
 import pickle
-
+# uuid.uuid4()
 class client:
-    def __init__(self):
+    def __init__(self,path):
 
-        HOST = default.decrypt("ghfgyfxfsg")
-        print(HOST)
+        HOST = default.decrypt(path.split("/")[-1])
         PORT = 55555
 
 # Connect to server
+        try:
+            with open(f"{path}/id.pkl","rb") as f:
+                self.id = pickle.load(f)
+        except:
+            self.id = str(uuid.uuid4())
+            with open(f"{path}/id.pkl","wb") as f:
+                pickle.dump(self.id,f)
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((HOST, PORT))
-
+        default.send_msg(self.client,self.id)
 # Pygame setup
         pygame.init()
         pygame.display.set_caption("WorldSpawn")
@@ -46,5 +52,3 @@ class client:
         pygame.quit()
         self.client.close()
 
-test = client()
-test.main()

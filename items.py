@@ -1,4 +1,4 @@
-import pygame, default,textwrap
+import pygame,default,textwrap
 
 class inventory_item:
     def __init__(self, item_data, count=1):
@@ -177,7 +177,6 @@ class item(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(pos[0],pos[1]))
 
     def remove(self):
-        self.image = None
         self.rect = None
 
     def updator(self, game):
@@ -215,7 +214,7 @@ class modifiyer:
         :param type: damage,shield,max_health
         :param amount: either int or float(%)
         :param set: false for add, true for set
-        :param hand_needed: if the modify is needed to be on hand to apply
+        :param hand_needed: if the modifyer is needed to be on hand to apply
         :param right_click: if the modifiyer should apply on right click
         """
         self.type = type
