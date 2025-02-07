@@ -6,7 +6,6 @@ class server:
         self.lock = threading.Lock()
         self.path = path
         self.banned_players = []
-
         self.game_running = True
         pygame.init()
         pygame.time.set_timer(pygame.USEREVENT, 1000)
@@ -250,7 +249,7 @@ class server:
 
                 self.game_update()
                 try:
-                    self.camera_group.custom_draw(self.owner,True,ignore_render=True)
+                    self.camera_group.custom_draw(self.owner,True)
                 except:
                     pass
                 pygame.display.flip()
@@ -263,6 +262,7 @@ class server:
                         pickle.dump(player.to_dict(),f)
                     player.to_dict()
                     self.camera_group.remove(player)
+                    player.close()
                     self.players.remove(player)
                     del player
             self.close()
@@ -292,12 +292,14 @@ class server:
                 if Block.updator(self):
                     self.objects.remove(Block)
                     self.camera_group.remove(Block)
+                    Block.rect = None
                     del Block
         for Entity in self.entities:
             if Entity.render(self.players):
                 if Entity.updator(self):
                     self.entities.remove(Entity)
                     self.camera_group.remove(Entity)
+                    Entity.rect = None
                     del Entity
         for drop in self.drops:
             if drop.render(self.players):

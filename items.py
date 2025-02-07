@@ -139,7 +139,7 @@ class inventory:
                 if item.count <= 0:
                     item.remove()
 
-    def conver_to_drops(self,game):
+    def convert_to_drops(self, game):
         for row in self.inventory:
             for items in row:
                 if items.item_data.item_name != None:

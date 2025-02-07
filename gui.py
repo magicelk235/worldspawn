@@ -1,6 +1,4 @@
-import shutil
-
-import default,objects,items,math,pygame,os,copy,gif_pygame
+import default,objects,items,math,pygame,os,copy,gif_pygame,shutil
 
 class display_sprite(pygame.sprite.Sprite):
     def __init__(self,camera_group,rect,image,image_in_bytes):
@@ -386,7 +384,6 @@ class CameraGroup(pygame.sprite.Group):
         for sprite in self.sprites():    
             sprite.image = default.to_bytes(sprite.image)
 
-
     def player_load(self,player,client,ignore_render=False,clear_trash=True,always_update=False):
         sprite_list = []
         load_object_start = [
@@ -547,8 +544,12 @@ class CameraGroup(pygame.sprite.Group):
 
         cave_ground_offset1 = self.cave_ground_rect1.topleft - self.offset + self.internal_offset
         self.internal_surf.blit(self.cave_ground_surf1, cave_ground_offset1)
+
+
         for sprite in self.player_load(player,client,ignore_render,always_update=True):
+
             default.display_image(sprite["sprite"].image, self.internal_surf, sprite["location"])
+
 
         cave_offset = self.cave_rect.topleft - self.offset + self.internal_offset
         self.internal_surf.blit(self.cave_surf, cave_offset)
@@ -574,14 +575,14 @@ class world_menu_selector(pygame.sprite.Sprite):
                         if self.y < 3:
                             self.y += 1
                         else:
-                            self.offset += 3
+                            self.offset += 4
                             self.y = 0
                             world_menu.reset(self.offset,camera_group)
                     elif event.key == pygame.K_UP:
                         if self.y > 0:
                             self.y -= 1
                         elif self.offset != 0:
-                            self.offset -= 3
+                            self.offset -= 4
                             self.y = 3
                             world_menu.reset(self.offset, camera_group)
                     elif event.key == pygame.K_x:
@@ -645,16 +646,6 @@ class world_menu(pygame.sprite.Sprite):
             except:
                 pass
 
-
-    def delete(self):
-        for i in range(4):
-            if self.worlds_list[i] != None:
-                self.world_icons_list[i].delete()
-                self.world_names_list[i].delete()
-        self.rect = None
-        self.image = None
-
-
 class world_icon(pygame.sprite.Sprite):
     def __init__(self, pos, camera_group):
         super().__init__(camera_group)
@@ -664,7 +655,6 @@ class world_icon(pygame.sprite.Sprite):
     def delete(self):
         self.rect = None
         self.image = None
-
 
 class textbox(pygame.sprite.Sprite):
     def __init__(self,pos,camera_group):

@@ -2,16 +2,7 @@ import sys,random,pygame,os,items,entities,objects,math,gif_pygame,projectiles,p
 from heapq import heappush, heappop
 
 def get_pressed_key_names(key_states):
-    """
-    Converts pygame.key.get_pressed() and pygame.key.get_mods() output
-    into a list of key names currently pressed, including modifier keys.
 
-    Returns:
-        list: A list of key names (strings) corresponding to pressed keys.
-    """
-    # Get the state of all keys
-
-    # Special handling for modifier keys
     modifier_keys = {
         pygame.K_LSHIFT: "left shift",
         pygame.K_RSHIFT: "right shift",
@@ -20,18 +11,13 @@ def get_pressed_key_names(key_states):
         pygame.K_LALT: "left alt",
         pygame.K_RALT: "right alt",
     }
-
-    # Check for pressed keys
     key_names = []
     for index in range(len(key_states)):
         if key_states[index]:
-            # Check for modifier keys explicitly
             if index in modifier_keys:
                 key_names.append(modifier_keys[index])
             else:
                 key_names.append(pygame.key.name(index))
-
-    # Use pygame.key.get_mods() to add active modifiers (in case get_pressed misses them)
     mods = pygame.key.get_mods()
     if mods & pygame.KMOD_LSHIFT:
         if "left shift" not in key_names:
@@ -51,17 +37,9 @@ def get_pressed_key_names(key_states):
     if mods & pygame.KMOD_RALT:
         if "right alt" not in key_names:
             key_names.append("right alt")
-
     return key_names
 
 def serialize_pygame_inputs(pygame_events,keys,mouse_pos):
-    """
-    Serialize Pygame inputs for network transmission as a list.
-
-    Returns:
-    list: [events, key_states, mouse_pos]
-    """
-    # Serialize events
     events = []
     for event in pygame_events:
         event_dict = {
@@ -70,22 +48,18 @@ def serialize_pygame_inputs(pygame_events,keys,mouse_pos):
         }
         events.append(event_dict)
 
-    # Serialize key states
     key_states = get_pressed_key_names(keys)
 
-    # Serialize mouse position
     mouse_pos = list(mouse_pos)
 
     return [events, key_states, mouse_pos]
 
 def send_msg(sock, msg):
-    """Send a message with length prefix."""
     msg = pickle.dumps(msg)
     msg = struct.pack('>I', len(msg)) + msg
     sock.sendall(msg)
 
 def recv_msg(sock):
-    """Receive a message with length prefix."""
     raw_msglen = recvall(sock, 4)
     if not raw_msglen:
         return None
@@ -94,54 +68,37 @@ def recv_msg(sock):
     return data
 
 def recvall(sock, n):
-    """Helper function to recv n bytes or return None if EOF."""
     data = bytearray()
     while len(data) < n:
         packet = sock.recv(n - len(data))
         if not packet:
             return None
         data.extend(packet)
-
     return data
 
 def unserialize_pygame_inputs(serialized_inputs):
-    """Reconstruct Pygame inputs from serialized data."""
 
     events, key_states, mouse_pos = serialized_inputs
-
-    # Reconstruct events
     reconstructed_events = []
     for event_info in events:
         pygame_event = pygame.event.Event(event_info['type'])
         for k, v in event_info['dict'].items():
             setattr(pygame_event, k, v)
         reconstructed_events.append(pygame_event)
-    # Reconstruct key states
-
-
     return [reconstructed_events, key_states, mouse_pos]
 
-
 def to_bytes(image):
-
     if image != None:
-
         try:
-
             return pygame.image.tobytes(copy.deepcopy(image), "RGBA")
-
         except:
             new_image = copy.deepcopy(image)
             for i in range(len(image.frames)):
-
                 new_image.frames[i][0] = pygame.image.tobytes(image.frames[i][0],"RGBA")
-
             return new_image
-
     return None
 
 def from_bytes(image,size):
-
     try:
         return pygame.image.frombytes(copy.deepcopy(image),size, "RGBA")
     except:
@@ -149,7 +106,6 @@ def from_bytes(image,size):
             new_image = copy.deepcopy(image)
             for i in range(len(image.frames)):
                 new_image.frames[i][0] = pygame.image.frombytes(image.frames[i][0],size, "RGBA")
-
             return new_image
         except:
             return load_image(r"assets\gui\None")
@@ -161,28 +117,18 @@ def is_image_bytes(image):
         for i in range(image.frames):
             return isinstance(image.frames[i][0], bytes)
 
-
-
-
 def get_player(players,id):
     for player in players:
         if player.id == id:
             return player
     return None
 
-def rect_value_same(rect1,rect2):
-    if rect1.x == rect2.x and rect1.y == rect2.y and rect1.w == rect2.w and rect1.h == rect2.h:
-        return True
-    return False
-
 def encrypt(ip):
-
     crypted_ip = ""
     crypt_dic = {"0":"h","1":"g","2":"y","3":"a","4":"j","5":"m","6":"c","7":"t","8":"x","9":"s",".":"f"}
     for char in ip:
         crypted_ip += crypt_dic[char]
     return crypted_ip
-
 
 def decrypt(ip):
     decrypted_ip = ""
@@ -191,23 +137,8 @@ def decrypt(ip):
         decrypted_ip += decrypt_dic[char]
     return decrypted_ip
 
-
-
-
-
 def is_point_on_line(x0, y0, angle, x, y, tolerance=1e-6):
-    """
-    Check if a point (x, y) lies on a line starting from (x0, y0) at a given angle.
 
-    Args:
-        x0, y0: Starting point of the line.
-        angle: Angle of the line in degrees, measured from the positive x-axis.
-        x, y: Coordinates of the point to check.
-        tolerance: Allowed tolerance for floating-point comparison.
-
-    Returns:
-        True if the point lies on the line, False otherwise.
-    """
     # Convert angle to radians
     theta = math.radians(angle)
     
@@ -1273,8 +1204,8 @@ def rotate(image,degree):
     except:
         return pygame.transform.rotate(image,degree)
 
-def round_dec(dec):
-    return int(dec*10)/10
+def round_dec(dec,max_place=10):
+    return int(dec*max_place)/max_place
 
 class recipe:
     def __init__(self,result,items):
@@ -1302,7 +1233,6 @@ class type_range:
     def __init__(self, min_value, max_value):
         self.min_value = min_value
         self.max_value = max_value
-
 
 def almost(location1,location2,step):
     if location2[0] - step > location1[0] or location1[0] > location2[0] - step:

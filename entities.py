@@ -76,7 +76,6 @@ class Player(pygame.sprite.Sprite):
         # render
         self.render.x = self.rect.x - 600
         self.render.y = self.rect.y - 400
-        self.attack_c_text.rect.center = self.hotbar.rect.center+pygame.math.Vector2(100,0)
         # inventory check
         self.hotbar.updator()
 
@@ -96,7 +95,7 @@ class Player(pygame.sprite.Sprite):
                 if self.inventory.has_item("totem"):
                     self.inventory.remove_item_amount("totem", 1)
                 else:
-                    self.inventory.conver_to_drops(game)
+                    self.inventory.convert_to_drops(game)
                 self.inventory_display.close_inventory()
                 self.crafting_gui.close()
                 self.ride_target = None
@@ -172,7 +171,7 @@ class Player(pygame.sprite.Sprite):
             self.direction.y = 0
         # animation updator
         if self.action not in self.path or self.animation_direction not in self.path:
-            
+
             self.path = f'assets/entities/player_{self.animation_direction}_{self.action}'
             self.image = default.load_image(self.path)
 
@@ -229,6 +228,7 @@ class Player(pygame.sprite.Sprite):
 
         self.rect.topleft += self.direction * self.speed
 
+
         if self.health < 0:
             self.health = 0
         if self.health > self.max_health:
@@ -242,7 +242,7 @@ class Player(pygame.sprite.Sprite):
             except:
                 self.ride_target = None
                 self.action = "idle"
-
+        self.attack_c_text.rect.center = self.hotbar.rect.center + pygame.math.Vector2(100, 0)
         if not self.gui_open and self.direction != [0,0]:
             self.block_selector.rect.x += self.speed * self.direction.x
             self.block_selector.rect.y += self.speed * self.direction.y
