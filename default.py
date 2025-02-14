@@ -1,6 +1,27 @@
 import sys,random,pygame,os,items,entities,objects,math,gif_pygame,projectiles,pickle,struct,copy
 from heapq import heappush, heappop
 
+import modifiyers
+
+
+class rect:
+    def __init__(self, rect, dimension):
+        self.rect = rect
+        self.dimension = dimension
+
+    def colliderect(self,other):
+        if self.rect.colliderect(other) and other.dimension == self.dimension:
+            return True
+        return False
+    def collidepoint(self,x,y,dimension):
+        if self.rect.collidepoint(x,y) and dimension == self.dimension:
+            return True
+        return False
+
+def get_rect(image,pos,dimension):
+    return rect(image.get_rect(topleft=pos),dimension)
+
+
 def get_pressed_key_names(key_states):
 
     modifier_keys = {
@@ -117,6 +138,8 @@ def is_image_bytes(image):
         for i in range(image.frames):
             return isinstance(image.frames[i][0], bytes)
 
+
+
 def get_player(players,id):
     for player in players:
         if player.id == id:
@@ -124,11 +147,11 @@ def get_player(players,id):
     return None
 
 def encrypt(ip):
-    crypted_ip = ""
+    encrypted_ip = ""
     crypt_dic = {"0":"h","1":"g","2":"y","3":"a","4":"j","5":"m","6":"c","7":"t","8":"x","9":"s",".":"f"}
     for char in ip:
-        crypted_ip += crypt_dic[char]
-    return crypted_ip
+        encrypted_ip += crypt_dic[char]
+    return encrypted_ip
 
 def decrypt(ip):
     decrypted_ip = ""
@@ -224,25 +247,18 @@ class thrower:
 
 def calculate_path(start, end, blocks, width, height, max_steps=None,speed=20):
 
-
     def is_walkable(pos):
         x, y = pos
         object_rect = pygame.Rect(x, y, width, height)
-
-        # Check for collisions with solid objects
         for sprite in blocks:
             if sprite.is_solid and object_rect.colliderect(sprite.rect_hitbox):
                 return False
-
         return True
 
     def heuristic(a, b):
-        """Calculate the Manhattan distance heuristic."""
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-    # Ensure we can reach the end even if speed is greater than the distance
-    def adjust_position(pos, target):
-        """Adjusts the position to the target if within one step."""
+    def adjust_position(pos, target):    
         x, y = pos
         tx, ty = target
         if abs(tx - x) < speed:
@@ -251,7 +267,7 @@ def calculate_path(start, end, blocks, width, height, max_steps=None,speed=20):
             y = ty
         return x, y
 
-    # Priority queue for open nodes
+    
     open_set = []
     heappush(open_set, (0, start))
     came_from = {}
@@ -382,7 +398,7 @@ def projectile_item_template(names,amount,needed_items,needed_item_amount):
     needed_items = {needed_items}
     needed_item_amount = {needed_item_amount}
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-        if not self.gui_open and self.attack_c > self.attack_cooldown:
+        if not self.gui_open and self.attack_c == self.attack_cooldown:
             n = 0
             for name in needed_items:
                 item = self.inventory.get_item(name)
@@ -392,7 +408,7 @@ def projectile_item_template(names,amount,needed_items,needed_item_amount):
                         game.projectiles.append(projectiles.projectile(game, self.rect.center, random_aim,default.get_projectile(names[n]), self))
                     self.attack_c = 0
                     item.count -= needed_item_amount
-                    self.inventory.apply_modifiers()
+                    self.inventory.apply_modifiyers()
                     break
                 n += 1
     
@@ -421,7 +437,7 @@ def object_item_template(name):
         if not same_pos:
             game.objects.append(objects.object(game, (self.block_selector.x * 26, self.block_selector.y * 20),item_object, self.id))
             self.hand.count -= 1
-            self.inventory.apply_modifiers()
+            self.inventory.apply_modifiyers()
     
     """
     return code
@@ -433,7 +449,7 @@ def entity_item_template(name):
         if not default.collide(game.objects, self.block_selector.rect):
             game.entities.append(entities.entity(game, default.get_entity('{name}'),self.block_selector.rect.center, self.id))
             self.hand.count -= 1
-            self.inventory.apply_modifiers()
+            self.inventory.apply_modifiyers()
         """
     return code
 
@@ -443,13 +459,28 @@ def food_item_template(health):
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and self.health != self.max_health:
         if {health} + self.health > self.max_health:
             self.hand.count -= 1
-            self.inventory.apply_modifiers()
+            self.inventory.apply_modifiyers()
             self.health = self.max_health
         else:
             self.hand.count -= 1
             self.health += {health}
-            self.inventory.apply_modifiers()
+            self.inventory.apply_modifiyers()
     
+    """
+    return code
+
+def potion_item_template(color, cooldown,modifiyer_cooldown, modifiyer_type, modifiyer_amount, modifiyer_set=True, modifiyer_percent=False, only_players=False):
+
+
+    code = f"""
+    
+    import sys, random, pygame, os, items, entities, objects, math, gif_pygame, default, modifiyers
+    
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+        self.hand.count -= 1
+        self.inventory.apply_modifiyers()
+        game.potion_clouds.append(modifiyers.potion_cloud(self.rect.center,game,{color},{cooldown},modifiyers.modifiyer('{modifiyer_type}',{modifiyer_amount},{modifiyer_set},hand_needed=False,percent={modifiyer_percent}),{modifiyer_cooldown},{only_players}))
+        
     """
     return code
 
@@ -475,16 +506,20 @@ def get_material(name):
         items.item_data("stick"),
         items.item_data("crystal"),
 
-        items.item_data("golden_chain", 1, [items.modifiyer("max_health", 14, True, False)]),
-        items.item_data("mega_shield", 1, [items.modifiyer("speed", -4,choose_bigger=False), items.modifiyer("shield", 1.5, True)]),
-        items.item_data("magic_book",1,[items.modifiyer("attack_cooldown",1.3)],event=projectile_item_template(["soul"],3,["magic_book"],0)),
-        items.item_data("scythe", 1, [items.modifiyer("damage", 3)], tool_type="_sword_soul"),
-        items.item_data("wings",1,modifiyers=[items.modifiyer("speed",3,False,False),items.modifiyer("attack_cooldown",-0.2,False,False,percent=True)]),
+        items.item_data("golden_chain", 1, [modifiyers.modifiyer("max_health", 14, True, False)]),
+        items.item_data("mega_shield", 1, [modifiyers.modifiyer("speed", -1.0, set=True,choose_bigger=False,percent=True), modifiyers.modifiyer("shield", 1.5, True)]),
+        items.item_data("magic_book", 1, [modifiyers.modifiyer("attack_cooldown", 1.3)], event=projectile_item_template(["soul"], 3, ["magic_book"], 0)),
+        items.item_data("scythe", 1, [modifiyers.modifiyer("damage", 3)], tool_type="_sword_soul"),
+        items.item_data("wings", 1, modifiyers=[modifiyers.modifiyer("speed", 3, False, False)]),
         items.item_data("genie_lamp", 1, event=entity_item_template("genie_friendly")),
-        items.item_data("trident", 1,modifiyers=[items.modifiyer("damage",3),items.modifiyer("attack_cooldown",0.5)], event=projectile_item_template(["trident"],1,["trident"],1),tool_type="_sword"),
+        items.item_data("trident", 1, modifiyers=[modifiyers.modifiyer("damage", 3),modifiyers.modifiyer("attack_cooldown", 0.5)], event=projectile_item_template(["trident"], 1, ["trident"], 1), tool_type="_sword"),
 
-        items.item_data("spawn_potion", 32, [items.modifiyer("rect.topleft", (3001, 3008), True, True, True)]),
+        items.item_data("spawn_potion", 32, [modifiyers.modifiyer("rect.topleft", (3001, 3008), True, True, True)]),
         items.item_data("beer", 32,event=food_item_template(2)),
+
+        items.item_data("health_potion", 32,event=potion_item_template((255,139,208),6,60*5,"max_health",0.25,False,True)),
+        items.item_data("speed_potion", 32,event=potion_item_template((100,231,255),6,60*5,"speed",0.25,False,True)),
+        items.item_data("strength_potion", 32,event=potion_item_template((209,0,7),6,60*5,"damage",0.25,False,True)),
 
         items.item_data("bush"),
 
@@ -532,54 +567,95 @@ def get_material(name):
         items.item_data("wooden_pickaxe", 1, tool_type="_pickaxe"),
         items.item_data("wooden_axe", 1, tool_type="_axe"),
         items.item_data("wooden_hoe", 1, tool_type="_hoe"),
-        items.item_data("wooden_chestplate", 1, [items.modifiyer("shield", 0.05, True, False)]),
-        items.item_data("wooden_dagger", 1,[items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
-        items.item_data("wooden_spear", 1,[items.modifiyer("damage", 1),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
+        items.item_data("wooden_chestplate", 1, [modifiyers.modifiyer("shield", 0.05, True, False)]),
+        items.item_data("wooden_dagger", 1, [modifiyers.modifiyer("damage", 2),
+                                             modifiyers.modifiyer("attack_cooldown", 0.3),
+                                             modifiyers.modifiyer("range", 0.3)], tool_type="_sword"),
+        items.item_data("wooden_spear", 1, [modifiyers.modifiyer("damage", 1),
+                                            modifiyers.modifiyer("attack_cooldown", 0.6),
+                                            modifiyers.modifiyer("range", 2)], tool_type="_sword"),
 
-        items.item_data("wooden_hammer", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+        items.item_data("wooden_hammer", 1, [modifiyers.modifiyer("damage", 3),
+                                             modifiyers.modifiyer("attack_cooldown", 1.0)], tool_type="_sword"),
 
 
-        items.item_data("copper_sword", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
-        items.item_data("copper_pickaxe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
-        items.item_data("copper_axe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
-        items.item_data("copper_hoe", 1, [items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
-        items.item_data("copper_chestplate", 1, [items.modifiyer("shield", 0.1, True, False)]),
-        items.item_data("copper_dagger", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
-        items.item_data("copper_spear", 1,[items.modifiyer("damage", 2),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
-        items.item_data("copper_hammer", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+        items.item_data("copper_sword", 1, [modifiyers.modifiyer("damage", 2),
+                                            modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_sword"),
+        items.item_data("copper_pickaxe", 1, [modifiyers.modifiyer("damage", 2),
+                                              modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_pickaxe"),
+        items.item_data("copper_axe", 1, [modifiyers.modifiyer("damage", 2),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_axe"),
+        items.item_data("copper_hoe", 1, [modifiyers.modifiyer("damage", 2),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_hoe"),
+        items.item_data("copper_chestplate", 1, [modifiyers.modifiyer("shield", 0.1, True, False)]),
+        items.item_data("copper_dagger", 1, [modifiyers.modifiyer("damage", 3),
+                                             modifiyers.modifiyer("attack_cooldown", 0.3),
+                                             modifiyers.modifiyer("range", 0.3)], tool_type="_sword"),
+        items.item_data("copper_spear", 1, [modifiyers.modifiyer("damage", 2),
+                                            modifiyers.modifiyer("attack_cooldown", 0.6),
+                                            modifiyers.modifiyer("range", 2)], tool_type="_sword"),
+        items.item_data("copper_hammer", 1, [modifiyers.modifiyer("damage", 4),
+                                             modifiyers.modifiyer("attack_cooldown", 1.0)], tool_type="_sword"),
 
-        items.item_data("iron_sword", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
-        items.item_data("iron_pickaxe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
-        items.item_data("iron_axe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
-        items.item_data("iron_hoe", 1, [items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
-        items.item_data("iron_chestplate", 1, [items.modifiyer("shield", 0.15, True, False)]),
-        items.item_data("iron_dagger", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
-        items.item_data("iron_spear", 1,[items.modifiyer("damage", 3),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
-        items.item_data("iron_hammer", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+        items.item_data("iron_sword", 1, [modifiyers.modifiyer("damage", 3),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_sword"),
+        items.item_data("iron_pickaxe", 1, [modifiyers.modifiyer("damage", 3),
+                                            modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_pickaxe"),
+        items.item_data("iron_axe", 1, [modifiyers.modifiyer("damage", 3),
+                                        modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_axe"),
+        items.item_data("iron_hoe", 1, [modifiyers.modifiyer("damage", 3),
+                                        modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_hoe"),
+        items.item_data("iron_chestplate", 1, [modifiyers.modifiyer("shield", 0.15, True, False)]),
+        items.item_data("iron_dagger", 1, [modifiyers.modifiyer("damage", 4),
+                                           modifiyers.modifiyer("attack_cooldown", 0.3),
+                                           modifiyers.modifiyer("range", 0.3)], tool_type="_sword"),
+        items.item_data("iron_spear", 1, [modifiyers.modifiyer("damage", 3),
+                                          modifiyers.modifiyer("attack_cooldown", 0.6),
+                                          modifiyers.modifiyer("range", 2)], tool_type="_sword"),
+        items.item_data("iron_hammer", 1, [modifiyers.modifiyer("damage", 5),
+                                           modifiyers.modifiyer("attack_cooldown", 1.0)], tool_type="_sword"),
 
-        items.item_data("silver_sword", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
-        items.item_data("silver_pickaxe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
-        items.item_data("silver_axe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
-        items.item_data("silver_hoe", 1, [items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
-        items.item_data("silver_chestplate", 1, [items.modifiyer("shield", 0.2, True, False)]),
-        items.item_data("silver_dagger", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
-        items.item_data("silver_spear", 1,[items.modifiyer("damage", 4),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
-        items.item_data("silver_hammer", 1,[items.modifiyer("damage", 6),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+        items.item_data("silver_sword", 1, [modifiyers.modifiyer("damage", 4),
+                                            modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_sword"),
+        items.item_data("silver_pickaxe", 1, [modifiyers.modifiyer("damage", 4),
+                                              modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_pickaxe"),
+        items.item_data("silver_axe", 1, [modifiyers.modifiyer("damage", 4),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_axe"),
+        items.item_data("silver_hoe", 1, [modifiyers.modifiyer("damage", 4),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_hoe"),
+        items.item_data("silver_chestplate", 1, [modifiyers.modifiyer("shield", 0.2, True, False)]),
+        items.item_data("silver_dagger", 1, [modifiyers.modifiyer("damage", 5),
+                                             modifiyers.modifiyer("attack_cooldown", 0.3),
+                                             modifiyers.modifiyer("range", 0.3)], tool_type="_sword"),
+        items.item_data("silver_spear", 1, [modifiyers.modifiyer("damage", 4),
+                                            modifiyers.modifiyer("attack_cooldown", 0.6),
+                                            modifiyers.modifiyer("range", 2)], tool_type="_sword"),
+        items.item_data("silver_hammer", 1, [modifiyers.modifiyer("damage", 6),
+                                             modifiyers.modifiyer("attack_cooldown", 1.0)], tool_type="_sword"),
 
-        items.item_data("gold_sword", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_sword"),
-        items.item_data("gold_pickaxe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_pickaxe"),
-        items.item_data("gold_axe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_axe"),
-        items.item_data("gold_hoe", 1, [items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.5)], tool_type="_hoe"),
-        items.item_data("gold_chestplate", 1, [items.modifiyer("shield", 0.25, True, False)]),
-        items.item_data("gold_dagger", 1,[items.modifiyer("damage", 6),items.modifiyer("attack_cooldown",0.3),items.modifiyer("range",0.3)], tool_type="_sword"),
-        items.item_data("gold_spear", 1,[items.modifiyer("damage", 5),items.modifiyer("attack_cooldown",0.6),items.modifiyer("range",2)], tool_type="_sword"),
-        items.item_data("gold_hammer", 1,[items.modifiyer("damage", 7),items.modifiyer("attack_cooldown",1.0)], tool_type="_sword"),
+        items.item_data("gold_sword", 1, [modifiyers.modifiyer("damage", 5),
+                                          modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_sword"),
+        items.item_data("gold_pickaxe", 1, [modifiyers.modifiyer("damage", 5),
+                                            modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_pickaxe"),
+        items.item_data("gold_axe", 1, [modifiyers.modifiyer("damage", 5),
+                                        modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_axe"),
+        items.item_data("gold_hoe", 1, [modifiyers.modifiyer("damage", 5),
+                                        modifiyers.modifiyer("attack_cooldown", 0.5)], tool_type="_hoe"),
+        items.item_data("gold_chestplate", 1, [modifiyers.modifiyer("shield", 0.25, True, False)]),
+        items.item_data("gold_dagger", 1, [modifiyers.modifiyer("damage", 6),
+                                           modifiyers.modifiyer("attack_cooldown", 0.3),
+                                           modifiyers.modifiyer("range", 0.3)], tool_type="_sword"),
+        items.item_data("gold_spear", 1, [modifiyers.modifiyer("damage", 5),
+                                          modifiyers.modifiyer("attack_cooldown", 0.6),
+                                          modifiyers.modifiyer("range", 2)], tool_type="_sword"),
+        items.item_data("gold_hammer", 1, [modifiyers.modifiyer("damage", 7),
+                                           modifiyers.modifiyer("attack_cooldown", 1.0)], tool_type="_sword"),
 
         items.item_data("phoenix_feather", 1,
-                        [items.modifiyer("damage", 20, hand_needed=False), items.modifiyer("speed", 2, False)],
+                        [modifiyers.modifiyer("damage", 20, hand_needed=False), modifiyers.modifiyer("speed", 2, False)],
                         tool_type="_hoe_pickaxe_axe_sword"),
 
-        items.item_data("shield", 1, [items.modifiyer("speed", -1, False,choose_bigger=False), items.modifiyer("shield", 0.40, True)]),
+        items.item_data("shield", 1, [modifiyers.modifiyer("speed", -1, False, choose_bigger=False), modifiyers.modifiyer("shield", 0.40, True)]),
 
         items.item_data("fire", 32),
         items.item_data("fire_wand",event=projectile_item_template(["fire"],1,["fire"],1)),
@@ -626,6 +702,7 @@ def get_material(name):
         items.item_data(None),
 
         items.item_data("wood_cube", event=object_item_template("wood_cube")),
+        items.item_data("cauldron", event=object_item_template("cauldron")),
         items.item_data("rock_cube", event=object_item_template("rock_cube")),
         items.item_data("magic_lantern", event=object_item_template("magic_lantern")),
         items.item_data("wooden_floor", event=object_item_template("wooden_floor")),
@@ -634,7 +711,7 @@ def get_material(name):
     ]
     for item in materials:
         if item.item_name == name:
-            return item
+            return copy.deepcopy(item)
 
 def get_entity(name):
     entity_list = [
@@ -799,7 +876,7 @@ def get_entity(name):
     ]
     for entity in entity_list:
         if entity.name == name:
-            return entity
+            return copy.deepcopy(entity)
 
 def get_object(name):
     work_bench_recipes = [
@@ -1002,6 +1079,12 @@ def get_object(name):
                [items.inventory_item("gold_bar", 6), items.inventory_item("silver_chestplate")]),
     ]
 
+    cauldron_recipes = [
+        recipe(items.inventory_item("copper_pickaxe", 1),
+               [items.inventory_item("stick", 2), items.inventory_item("copper_bar", 3),
+                items.inventory_item("wooden_pickaxe")]),
+    ]
+
     object_list = [
         objects.object_data("tomato", items.lootable("tomato_seeds"), 3, need_item("hoe", 1), None, False, None,objects.plant(5, items.lootable("tomato",2), 50, 3)),
         objects.object_data("flower_red", None, 3, need_item("hoe", 1), None, False, None,objects.plant(3, items.lootable("flower_red",2), 50)),
@@ -1038,6 +1121,7 @@ def get_object(name):
         objects.object_data("rock", items.lootable("rock", 2), 3, need_item("pickaxe", 1), type_range(1, 6)),
         objects.object_data("bush", items.lootable("bush"), 3, need_item("hoe", 1), type_range(1, 7)),
 
+        objects.object_data("cave_rock", items.lootable("rock", 2), 4, need_item("pickaxe", 1)),
         objects.object_data("copper_ore", items.lootable("copper_raw", 2), 4, need_item("pickaxe", 1)),
         objects.object_data("coal_ore", items.lootable("coal", 2), 4, need_item("pickaxe", 1)),
         objects.object_data("iron_ore", items.lootable("iron_raw", 2), 4, need_item("pickaxe", 2)),
@@ -1052,8 +1136,8 @@ def get_object(name):
                             hitbox(24, 18, 4, 5), dyeable=True),
         objects.object_data("door", items.lootable("door"), 1, need_item("axe", 1), None, True, hitbox(24, 18, 4, 5),
                             door=True, dyeable=True),
-        objects.object_data("work_bench", items.lootable("work_bench"), 1, need_item("axe", 1), None, True,
-                            hitbox(24, 18, 4, 5), None, work_bench_recipes),
+        objects.object_data("work_bench", items.lootable("work_bench"), 1, need_item("axe", 1), None, True,hitbox(24, 18, 4, 5), None, work_bench_recipes),
+        objects.object_data("cauldron", items.lootable("cauldron"), 1, need_item("pickaxe", 1), None, recipe_list=cauldron_recipes),
         objects.object_data("oven", items.lootable("oven"), 3, need_item("pickaxe", 1), None, True,
                             hitbox(24, 18, 4, 5),
                             None, oven_recipes),
@@ -1102,7 +1186,9 @@ if event.type == pygame.MOUSEBUTTONDOWN:
     for object in object_list:
         if object.name == name:
 
-            return object
+            return copy.deepcopy(object)
+
+
 
 def get_projectile(name):
     projectile_list = [

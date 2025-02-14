@@ -1,5 +1,8 @@
 import pygame,default,textwrap
 
+from modifiyers import modifiyer
+
+
 class inventory_item:
     def __init__(self, item_data, count=1):
 
@@ -38,7 +41,7 @@ class inventory:
                     return self.inventory[y][x]
         return None
 
-    def apply_modifiers(self,right_click=False):
+    def apply_modifiyers(self, right_click=False):
         self.updator()
         if self.has_modifiers:
             self.owner.reset_modifiers()
@@ -51,7 +54,14 @@ class inventory:
                     if item.item_data.item_name not in item_name_list:
                         item_name_list.append(item.item_data.item_name)
                         modifiyer.set(item.item_data.modifiyers, self.owner, right_click, False)
-            del item_name_list
+            used_modifiyers_list = []
+            for temp_modifiyer in self.owner.temporary_modifiyers:
+                if not temp_modifiyer.modifiyer in used_modifiyers_list:
+                    modifiyer.set([temp_modifiyer.modifiyer],self.owner)
+                    used_modifiyers_list.append(temp_modifiyer.modifiyer)
+
+
+
 
     def find_item(self, item_name):
         for x in range(self.x):
@@ -68,14 +78,14 @@ class inventory:
                     self.inventory[y][x].item_data.copy(item_data)
                     self.inventory[y][x].count = amount + temp
                     del temp
-                    self.apply_modifiers()
+                    self.apply_modifiyers()
                     return True
         for y in range(self.y - 1, -1, -1):
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == None:
                     self.inventory[y][x].item_data.copy(item_data)
                     self.inventory[y][x].count = amount
-                    self.apply_modifiers()
+                    self.apply_modifiyers()
                     return True
         return False
 
@@ -84,7 +94,7 @@ class inventory:
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == item_name and self.inventory[y][x].count >= amount:
                     self.inventory[y][x].count -= amount
-                    self.apply_modifiers()
+                    self.apply_modifiyers()
                     return True
 
         return False
@@ -94,14 +104,14 @@ class inventory:
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == item_name:
                     self.inventory[y][x].remove()
-                    self.apply_modifiers()
+                    self.apply_modifiyers()
                     return True
 
         return False
 
     def remove_at(self,x,y):
         self.inventory[y][x].remove()
-        self.apply_modifiers()
+        self.apply_modifiyers()
 
     def has_item(self, item_name, amount=None):
         for y in range(self.y - 1, -1, -1):
@@ -150,13 +160,13 @@ class inventory:
         if self.inventory[y][x].item_data.item_name != None:
             game.drops.append(item(game, (self.owner.rect.x + 30, self.owner.rect.y + 30), self.inventory[y][x].count,self.inventory[y][x].item_data))
             self.remove_at(x,y)
-            self.apply_modifiers()
+            self.apply_modifiyers()
 
     def clear_inventory(self):
         for x in range(self.x):
             for y in range(self.y):
                 self.inventory[x][y] = inventory_item(default.get_material(None), 0)
-        self.apply_modifiers()
+        self.apply_modifiyers()
 
     def copy(self,other):
         self.inventory = other.inventory
@@ -208,60 +218,9 @@ class item(pygame.sprite.Sprite):
         self.item_data = other.item_data
         self.rect = other.rect
 
-class modifiyer:
-    def __init__(self,type,amount,set=True,hand_needed=True,right_click=False,choose_bigger=True,percent=False):
-        """
-        :param type: damage,shield,max_health
-        :param amount: either int or float(%)
-        :param set: false for add, true for set
-        :param hand_needed: if the modifyer is needed to be on hand to apply
-        :param right_click: if the modifiyer should apply on right click
-        """
-        self.type = type
-        self.amount = amount
-        self.set = set
-        self.hand_needed = hand_needed
-        self.right_click = right_click
-        self.choose_bigger = choose_bigger
-        self.percent = percent
-
-    @staticmethod
-    def find(type,list):
-        for object in list:
-            if object.type == type:
-                return object
-            
-    @staticmethod
-    def get(type,list):
-        for object in list:
-            if object.type == type:
-                return object.amount
-        
-
-    @staticmethod
-    def set(modifiyers,object,right_click=False,hand=False):
-        for modifiyer in modifiyers:
-            if (not modifiyer.hand_needed or (modifiyer.hand_needed and hand)) and (not modifiyer.right_click or (modifiyer.right_click and right_click)):
-                if modifiyer.set:
-                    if modifiyer.choose_bigger and default.get_attr(object,modifiyer.type) < modifiyer.amount:
-                        default.set_attr(object,modifiyer.type,modifiyer.amount)
-                    elif not modifiyer.choose_bigger:
-                        default.set_attr(object, modifiyer.type, modifiyer.amount)
-                else:
-                    if modifiyer.percent:
-                        if isinstance(default.get_attr(object,modifiyer.type),float):
-                            value = default.get_attr(object,modifiyer.type)*(modifiyer.amount+1.0)
-                            value = int(value*10)
-
-                            default.set_attr(object, modifiyer.type,value)
-                        else:
-                            default.set_attr(object,modifiyer.type,int(default.get_attr(object,modifiyer.type)*(modifiyer.amount+1.0)))
-                    else:
-                        default.set_attr(object, modifiyer.type, default.get_attr(object, modifiyer.type)+modifiyer.amount)
 
 class item_data:
-
-    def __init__(self, item_name, max=32, modifiyers=[modifiyer("damage",1),modifiyer("attack_cooldown",0.5)],tool_type=None,color=None,event=None):
+    def __init__(self, item_name, max=32, modifiyers=[modifiyer("damage", 1), modifiyer("attack_cooldown", 0.5)], tool_type=None, color=None, event=None):
         self.tool_type = tool_type
         self.event = event
         if self.event != None:

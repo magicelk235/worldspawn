@@ -598,9 +598,9 @@ class world_menu_selector(pygame.sprite.Sprite):
                             return f"{world_menu.path}/{world_menu.worlds_list[self.y+self.offset]}"
                         except:
                             if "host" in world_menu.path:
-                                self.keyboard = keyboard(camera_group,world_menu.rect.bottomleft+pygame.math.Vector2(0,0),"enter world name")
+                                self.keyboard = keyboard(camera_group,world_menu.rect.bottomleft+pygame.math.Vector2(0,0),"enter world name",14)
                             else:
-                                self.keyboard = keyboard(camera_group, world_menu.rect.bottomleft+pygame.math.Vector2(0,0), "enter joining code")
+                                self.keyboard = keyboard(camera_group, world_menu.rect.bottomleft+pygame.math.Vector2(0,0), "enter joining code",14)
         else:
             entered_text = self.keyboard.update(event_list)
             try:
@@ -663,10 +663,11 @@ class textbox(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=pos)
 
 class keyboard:
-    def __init__(self,camera_group,pos,default_text=""):
-        self.text = default_text
+    def __init__(self,camera_group,pos,default_text="",max=30):
+        self.text = ""
+        self.max = max
         self.textbox = textbox(pos,camera_group)
-        self.text_object = text(pos+pygame.math.Vector2(20,28),13,self.text,camera_group)
+        self.text_object = text(pos+pygame.math.Vector2(20,28),13,default_text,camera_group)
 
     def set_text(self,text):
         self.text_object.set_text(text)
@@ -678,11 +679,13 @@ class keyboard:
                     return self.text
                 elif event.key == pygame.K_BACKSPACE:
                     self.text = self.text[:-1]
-                elif event.key == pygame.K_SPACE:
-                    self.text = self.text + " "
-                else:
-                    key_name = pygame.key.name(event.key)
-                    self.text = self.text + key_name
+                elif len(self.text)<self.max:
+                    if event.key == pygame.K_SPACE:
+                        self.text = self.text + " "
+                    else:
+                        key_name = pygame.key.name(event.key)
+                        if len(key_name)<2:
+                            self.text = self.text + key_name
                 self.text_object.set_text(self.text)
         return None
 
@@ -917,7 +920,7 @@ class hotbar(pygame.sprite.Sprite):
 
         if self.player.hand != temp:
             self.player.hand = temp
-            self.player.inventory.apply_modifiers()
+            self.player.inventory.apply_modifiyers()
             self.player.attack_c = 0.0
 
     def open_hotbar(self,game):

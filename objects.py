@@ -138,7 +138,7 @@ class object(pygame.sprite.Sprite):
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.health != None:
                         if player.block_selector.rect != None and self.rect.colliderect(player.block_selector.rect):
-                            if self.data.needed_item == None or (f"_{self.data.needed_item.item_name}" in str(player.hand.item_data.tool_type) and player.damage >= self.data.needed_item.min_damage) and player.attack_c == player.attack_cooldown:
+                            if self.data.needed_item == None or (f"_{self.data.needed_item.item_name}" in str(player.hand.item_data.tool_type) and player.damage >= self.data.needed_item.min_damage) and player.attack_c == player.attack_c:
                                 if not self.health <= 0:
                                     player.attack_c = 0
                                     self.apply_damage(player.damage,game,player)
@@ -259,7 +259,7 @@ class object(pygame.sprite.Sprite):
                 return True
 
 class cave(pygame.sprite.Sprite):
-    def __init__(self,pos,game,ore_name,max_ores,objects):
+    def __init__(self,pos,game,max_ores,objects):
         super().__init__(game.camera_group)
         self.path = 'assets/objects/cave_entering'
         self.image = default.load_image(self.path)
@@ -267,12 +267,14 @@ class cave(pygame.sprite.Sprite):
         self.cave_pos = (512,7510)
         self.org_pos = pos
         self.id = hash(self)
-        self.ore_name = ore_name
         self.max_ores = max_ores
-        self.caves_cooldown = 0
-        for i in range(self.max_ores):
-            objects.append(object(game, (99999, 99999), default.get_object(self.ore_name), self.id))
+        self.cave_cooldown = 0
+        self.selected_player = None
+        self.selected_player_id = None
+        self.cave_distance = pygame.Rect(0,0,1100,1100)
+        self.cave_distance.center = (512,7510)
         self.player_in = False
+        self.restock(game)
 
     def to_dict(self):
         return {
@@ -281,34 +283,40 @@ class cave(pygame.sprite.Sprite):
             "org_pos":self.org_pos,
             "cave_pos":self.cave_pos,
             "id":self.id,
-            "ore_name":self.ore_name,
             "max_ores":self.max_ores,
-            "caves_cooldown":self.caves_cooldown,
+            "cave_cooldown":self.cave_cooldown,
             "player_in":self.player_in,
+            "selected_player_id":self.selected_player_id,
         }
 
-    def from_dict(self,cave_dict):
+    def from_dict(self,cave_dict,players):
         self.path = cave_dict["path"]
         self.rect = cave_dict["rect"]
         self.org_pos = cave_dict["org_pos"]
         self.cave_pos = cave_dict["cave_pos"]
         self.id = cave_dict["id"]
-        self.ore_name = cave_dict["ore_name"]
         self.max_ores = cave_dict["max_ores"]
-        self.caves_cooldown = cave_dict["caves_cooldown"]
+        self.cave_cooldown = cave_dict["cave_cooldown"]
         self.player_in = cave_dict["player_in"]
 
 
     def updator(self,game):
-        for player in game.players:
-            for event in player.events:
-                if self.rect.colliderect(player.rect) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if not self.player_in:
+        for event in game.event_list:
+            if event.type == pygame.USEREVENT:
+                self.cave_cooldown += 1
+                if self.cave_cooldown >= 60*10:
+                    self.restock(game)
+        if not self.player_in:
+            for player in game.players:
+                for event in player.events:
+                    if self.rect.colliderect(player.rect) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                         self.path = 'assets/objects/cave_entering1'
                         self.image = default.load_image(self.path)
                         self.rect = self.image.get_rect(topleft=self.rect.topleft)
-                        player.rect.x = self.cave_pos[0]
-                        player.rect.y = self.cave_pos[1]
+                        self.selected_player = player
+                        self.selected_player_id = player.id
+                        self.selected_player.rect.x = self.cave_pos[0]
+                        self.selected_player.rect.y = self.cave_pos[1]
                         self.rect.x = self.cave_pos[0]
                         self.rect.y = self.cave_pos[1]
                         for block in game.objects:
@@ -316,25 +324,45 @@ class cave(pygame.sprite.Sprite):
                                 block.rect.x = random.randint(62, 908)
                                 block.rect.y = random.randint(7100, 7904)
                         self.player_in = True
-                    else:
-                        self.path = 'assets/objects/cave_entering'
-                        self.image = default.load_image(self.path)
-                        self.rect = self.image.get_rect(topleft=self.rect.topleft)
-                        player.rect.x = self.org_pos[0]
-                        player.rect.y = self.org_pos[1]
-                        for block in game.objects:
-                            if block.tag == self.id:
-                                block.rect.x = 9999999
-                                block.rect.y = 9999999
-                        self.rect.x = self.org_pos[0]
-                        self.rect.y = self.org_pos[1]
-                        self.player_in = False
+        elif self.selected_player != None:
+            for event in self.selected_player.events:
+                if self.rect.colliderect(self.selected_player.rect) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self.path = 'assets/objects/cave_entering'
+                    self.image = default.load_image(self.path)
+                    self.rect = self.image.get_rect(topleft=self.rect.topleft)
+                    self.selected_player.rect.x = self.org_pos[0]
+                    self.selected_player.rect.y = self.org_pos[1]
+                    for block in game.objects:
+                        if block.tag == self.id:
+                            block.rect.x = 9999999
+                            block.rect.y = 9999999
+                    self.rect.x = self.org_pos[0]
+                    self.rect.y = self.org_pos[1]
+                    self.player_in = False
+            if not self.cave_distance.colliderect(self.selected_player.rect):
+                self.path = 'assets/objects/cave_entering'
+                self.image = default.load_image(self.path)
+                self.rect = self.image.get_rect(topleft=self.rect.topleft)
+                for block in game.objects:
+                    if block.tag == self.id:
+                        block.rect.x = 9999999
+                        block.rect.y = 9999999
+                self.rect.x = self.org_pos[0]
+                self.rect.y = self.org_pos[1]
+                self.player_in = False
+        else:
+            self.selected_player = default.get_player(game.players,self.selected_player_id)
 
     def restock(self, game):
+        material_list = ["cave_rock","coal_ore","copper_ore","iron_ore","silver_ore","gold_ore","crystal"]
         new_ores_needed = self.max_ores - default.tag_counter(game.objects,self.id)
         if new_ores_needed != 0:
             for i in range(new_ores_needed):
-                game.objects.append(object(game, (99999, 99999), default.get_object(self.ore_name), self.id))
+                numbers = [0,1, 2, 3, 4, 5, 6]
+                weights = [0.8,0.7, 0.6, 0.5, 0.4, 0.3,0.2]
+                choice = random.choices(numbers, weights=weights, k=1)
+                n = choice[0]
+                game.objects.append(object(game, (99999, 99999), default.get_object(material_list[n]), self.id))
         if self.player_in:
             for block in game.objects:
                 if block.tag == self.id:
@@ -345,18 +373,9 @@ class cave(pygame.sprite.Sprite):
     def close(self):
         self.image = None
 
-    def copy(self,other,group):
-        self.path = other.path
-        self.image = default.load_image(self.path)
-        self.rect = other.rect
-        self.cave_pos = other.cave_pos
-        self.org_pos = other.org_pos
-        self.player_in = other.player_in
-        self.id = other.id
-        self.max_ores = other.max_ores
-
     def render(self,players):
         for player in players:
             if self.rect.colliderect(player.render):
                 return True
         return False
+

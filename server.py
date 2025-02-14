@@ -3,7 +3,7 @@ import socket,pygame,gui,random,events,default,entities,objects,items,threading,
 class server:
     def __init__(self,path):
         self.port = 55555
-        self.lock = threading.Lock()
+
         self.path = path
         self.banned_players = []
         self.game_running = True
@@ -30,6 +30,7 @@ class server:
         self.drops = []
         self.events = []
         self.projectiles = []
+        self.potion_clouds = []
         self.events.append(events.event(self, events.event_data(5 * 60, 2.5 * 60, "night", "night",
                                                                 ["zombie", "skeleton", "troll", "ogre", "fungal",
                                                                  "cyclops", "caveman", "witch", "stone_golem"])))
@@ -118,62 +119,40 @@ class server:
     def world_gen(self):
 
         self.objects.append(objects.object(self, (2954, 2970), default.get_object("spawn0")))
+        self.caves.append(objects.cave((3100, 3100), self, 15, self.objects))
         used_places = []
         for i in range(400):
             print(i)
-            while True:
-                random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                if random_place not in used_places:
-                    used_places.append(random_place)
-                    self.objects.append(objects.object(self, random_place,default.get_object("rock")))
-                    break
+            random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+            self.objects.append(objects.object(self, random_place,default.get_object("rock")))
             if i < 180:
                 for name in ["tree_white","tree_swirling","tree_willow","tree_cherry","tree_oak","tree_spruce","bush","twig"]:
-                    while True:
-                        random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                        if random_place not in used_places:
-                            used_places.append(random_place)
-                            self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                            break
-
+                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
+                    if self.objects[-1].data.plant_data != None:
+                        self.objects[-1].stage = self.objects[-1].data.plant_data.max_stage
             if i < 100:
                 for name in ["pumpkin","tomato","potato","carrot","wheat","flower_red","flower_white","flower_blue","flower_green","flower_black"]:
-                    while True:
-                        random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                        if random_place not in used_places:
-                            used_places.append(random_place)
-                            self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                            break
+                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
+                    if self.objects[-1].data.plant_data != None:
+                        self.objects[-1].stage = self.objects[-1].data.plant_data.max_stage
             if i < 50:
                 for name in ["lake","cliff","mini_cliff"]:
-                    while True:
-                        random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                        if random_place not in used_places:
-                            used_places.append(random_place)
-                            self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                            break
+                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
+
             if i < 12:
                 for name in ["goat", "cow", "pig", "sheep", "chicken", "duck", "deer", "horse", "lion","dog"]:
                     self.entities.append(entities.entity(self, default.get_entity(name),(random.randint(10, 178) * 32, random.randint(10, 151) * 23)))
-                for name in ["coal_ore", "copper_ore", "iron_ore", "silver_ore", "gold_ore", "crystal","rock"]:
-                    while True:
-                        random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                        if random_place not in used_places:
-                            used_places.append(random_place)
-                            self.caves.append(objects.cave(random_place, self, name, 15, self.objects))
-                            break
+                random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+                self.caves.append(objects.cave(random_place, self, 15, self.objects))
+
             if i < 4:
                 for name in ["sand_temple","olympos","ruined_village","cursed_olympos","knight_tower","defence_tower","ship"]:
-                    while True:
-                        random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                        if random_place not in used_places:
-                            used_places.append(random_place)
-                            self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                            break
+                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
+                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
 
-        for block in self.objects:
-            if block.data.plant_data != None:
-                block.stage = block.data.plant_data.max_stage
         self.objects.append(objects.object(self, (0, 7061), default.get_object("cave_border_x")))
         self.objects.append(objects.object(self, (0, 8020), default.get_object("cave_border_x")))
         self.objects.append(objects.object(self, (0, 7061), default.get_object("cave_border_y")))
@@ -223,50 +202,46 @@ class server:
                 self.events[i].from_dict(new_events[i])
 
     def main(self):
-        with self.lock:
-            threading.Thread(target=self.start_server).start()
-            while self.game_running:
-
-                self.owner.mouse = pygame.mouse.get_pos()
-                self.owner.events = pygame.event.get()
-                self.event_list = self.owner.events
-                self.owner.keys = pygame.key.get_pressed()
-                self.owner.keys = default.get_pressed_key_names(self.owner.keys)
-                for data in self.update_data:
-                    data[0].keys = data[2]
-                    data[0].events = data[1]
-                    data[0].mouse = data[3]
-                for id in self.new_players:
-                    self.players.append(entities.Player((3001, 3008), self))
-                    if os.path.exists(f"{self.path}/players/{id}.pkl"):
-                        self.players[-1].from_dict(self.path, id)
-                    self.players[-1].id = id
-                    self.new_players.remove(id)
-
-                for event in self.owner.events:
-                    if event.type == pygame.QUIT:
-                        self.game_running = False
-
-                self.game_update()
-                try:
-                    self.camera_group.custom_draw(self.owner,True)
-                except:
-                    pass
-                pygame.display.flip()
-                for player in self.remove_player_list:
-                    player.gui_open = False
-                    self.remove_player_list.remove(player)
-                    if not os.path.exists(f"{self.path}/players"):
-                        os.mkdir(f"{self.path}/players")
-                    with open(f"{self.path}/players/{player.id}.pkl", "wb") as f:
-                        pickle.dump(player.to_dict(),f)
-                    player.to_dict()
-                    self.camera_group.remove(player)
-                    player.close()
-                    self.players.remove(player)
-                    del player
-            self.close()
-            pygame.quit()
+        threading.Thread(target=self.start_server).start()
+        while self.game_running:
+            self.owner.mouse = pygame.mouse.get_pos()
+            self.owner.events = pygame.event.get()
+            self.event_list = self.owner.events
+            self.owner.keys = pygame.key.get_pressed()
+            self.owner.keys = default.get_pressed_key_names(self.owner.keys)
+            for data in self.update_data:
+                data[0].keys = data[2]
+                data[0].events = data[1]
+                data[0].mouse = data[3]
+            for id in self.new_players:
+                self.players.append(entities.Player((3001, 3008), self))
+                if os.path.exists(f"{self.path}/players/{id}.pkl"):
+                    self.players[-1].from_dict(self.path, id)
+                self.players[-1].id = id
+                self.new_players.remove(id)
+            for event in self.owner.events:
+                if event.type == pygame.QUIT:
+                    self.game_running = False
+            self.game_update()
+            try:
+                self.camera_group.custom_draw(self.owner,True)
+            except:
+                pass
+            pygame.display.flip()
+            for player in self.remove_player_list:
+                player.gui_open = False
+                self.remove_player_list.remove(player)
+                if not os.path.exists(f"{self.path}/players"):
+                    os.mkdir(f"{self.path}/players")
+                with open(f"{self.path}/players/{player.id}.pkl", "wb") as f:
+                    pickle.dump(player.to_dict(),f)
+                player.to_dict()
+                self.camera_group.remove(player)
+                player.close()
+                self.players.remove(player)
+                del player
+        self.close()
+        pygame.quit()
 
     def start_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -294,6 +269,12 @@ class server:
                     self.camera_group.remove(Block)
                     Block.rect = None
                     del Block
+        for potion in self.potion_clouds:
+            if potion.render(self.players):
+                if potion.updator(self):
+                    self.potion_clouds.remove(potion)
+                    self.camera_group.remove(potion)
+                    del potion
         for Entity in self.entities:
             if Entity.render(self.players):
                 if Entity.updator(self):
