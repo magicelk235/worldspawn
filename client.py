@@ -1,12 +1,12 @@
-import socket,default,json,gui,uuid
+import socket,default,json,gui,uuid,numpy,threading
 import pygame
 import pickle
-# uuid.uuid4()
 class client:
     def __init__(self,path):
 
-        HOST = default.decrypt(path.split("/")[-1])
+        self.server_ip = default.decrypt(path.split("/")[-1])
         PORT = 55555
+
 
 # Connect to server
         try:
@@ -16,8 +16,9 @@ class client:
             self.id = str(uuid.uuid4())
             with open(f"{path}/id.pkl","wb") as f:
                 pickle.dump(self.id,f)
+
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.connect((HOST, PORT))
+        self.client.connect((self.server_ip, PORT))
         default.send_msg(self.client,self.id)
 # Pygame setup
         pygame.init()
@@ -26,6 +27,7 @@ class client:
         pygame.display.set_mode((800,400),pygame.SCALED | pygame.RESIZABLE)
         self.running = True
         self.camera_group = gui.CameraGroup()
+
 
     def main(self):
         while self.running:
@@ -39,12 +41,10 @@ class client:
             mouse_pos = pygame.mouse.get_pos()
             data = default.serialize_pygame_inputs(events,key_states,mouse_pos)
             default.send_msg(self.client,data)
+            screen = default.recv_surface(self.client)
+            if screen:
 
-            server_data = default.recv_msg(self.client)
-
-            self.camera_group.from_dict(server_data[0])
-
-            self.camera_group.normal_draw(gui.fake_player(self.camera_group,server_data[1]["rect"],default.from_bytes(server_data[1]["image"],server_data[1]["size"]),server_data[1]["image"]))
+                self.camera_group.client_draw(screen)
             pygame.display.flip()
 
             

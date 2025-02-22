@@ -18,7 +18,7 @@ def worldspawn():
                 pygame.quit()
                 return
 
-        camera_group.custom_draw(main_gui,False,True)
+        camera_group.server_draw(main_gui, False, True)
 
         if game_type != None:
             path = world_menu_selector.updator(event_list, world_menu, camera_group)
@@ -26,7 +26,7 @@ def worldspawn():
             game_type = host_or_join.updator(event_list)
             if game_type != None:
                 world_menu = gui.world_menu((2000, 2000), camera_group, game_type)
-                world_menu_selector = gui.world_menu_selector((2000, 2000), camera_group)
+                world_menu_selector = gui.world_menu_selector((2000, 2000),"world", camera_group)
                 main_gui = world_menu
                 camera_group.remove(host_or_join)
 

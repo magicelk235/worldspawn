@@ -9,21 +9,19 @@ class projectile_data:
         self.damage = damage
 
 class projectile(pygame.sprite.Sprite):
-    def __init__(self,game,pos1,pos2,data,attacker=None):
+    def __init__(self,game,dimension,pos1,pos2,data,attacker=None):
         super().__init__(game.camera_group)
         self.path = f"assets/projectiles/{data.name}"
-        self.image = default.load_image(self.path)
+        self.image = default.image(self.path)
         self.past_path = 0
         self.angle = 0
-        self.rect = self.image.get_rect(center=pos1)
+        self.rect = self.image.get_rect(pos1,dimension)
         self.data = data
         self.attacker = attacker
         self.angle = (math.degrees(math.atan2(-(pos1[1]-pos2[1]),pos1[0]-pos2[0]))+180) % 360
         if 90 < self.angle < 270:
-            self.image = default.flip(self.image,False,True)
-            self.image = default.rotate(self.image,self.angle)
-        else:
-            self.image = default.rotate(self.image,self.angle)
+            self.image.flip(False,True)
+        self.image.rotate(self.angle)
 
     def close(self,game):
         if self.data.return_to_attacker:
@@ -31,10 +29,8 @@ class projectile(pygame.sprite.Sprite):
                 if not self.attacker.inventory.add_item(default.get_material(self.data.name),1):
                     raise Exception("cant")
             except:
-                game.drops.append(items.item(game, self.attacker.rect.center, 1, default.get_material(self.data.name)))
+                game.drops.append(items.item(game, self.attacker.rect.rect.center,self.rect.dimension, 1, default.get_material(self.data.name)))
         self.image = None
-        self.rect.x = 99999999
-        self.rect.y = 99999999
         self.rect = None
         self.attacker = None
         del self
@@ -46,8 +42,8 @@ class projectile(pygame.sprite.Sprite):
         dx = self.data.speed * math.cos(radians)
         dy = -self.data.speed * math.sin(radians)
 
-        self.rect.x += dx
-        self.rect.y += dy
+        self.rect.rect.x += dx
+        self.rect.rect.y += dy
         self.past_path += abs(dy) + abs(dx)
 
     def render(self,players):
@@ -62,7 +58,7 @@ class projectile(pygame.sprite.Sprite):
                 self.close(game)
 
                 return True
-                # projectile damage
+
         for entity in game.entities:
             if self.rect.colliderect(entity.rect) and entity != self.attacker and not default.has_one_tag(entity,self.attacker):
                 entity.apply_damage(self.data.damage,game,self.attacker)

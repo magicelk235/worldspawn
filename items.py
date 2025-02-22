@@ -1,6 +1,7 @@
 import pygame,default,textwrap
 
-from modifiyers import modifiyer
+import objects
+from modifiers import modifier
 
 
 class inventory_item:
@@ -41,24 +42,24 @@ class inventory:
                     return self.inventory[y][x]
         return None
 
-    def apply_modifiyers(self, right_click=False):
+    def apply_modifiers(self, right_click=False):
         self.updator()
         if self.has_modifiers:
             self.owner.reset_modifiers()
             try:
-                modifiyer.set(self.owner.hand.item_data.modifiyers, self.owner, right_click, True)
+                modifier.set(self.owner.hand.item_data.modifiers, self.owner, right_click, True)
             except:pass
             item_name_list = []
             for row in self.inventory:
                 for item in row:
                     if item.item_data.item_name not in item_name_list:
                         item_name_list.append(item.item_data.item_name)
-                        modifiyer.set(item.item_data.modifiyers, self.owner, right_click, False)
-            used_modifiyers_list = []
-            for temp_modifiyer in self.owner.temporary_modifiyers:
-                if not temp_modifiyer.modifiyer in used_modifiyers_list:
-                    modifiyer.set([temp_modifiyer.modifiyer],self.owner)
-                    used_modifiyers_list.append(temp_modifiyer.modifiyer)
+                        modifier.set(item.item_data.modifiers, self.owner, right_click, False)
+            used_modifiers_list = []
+            for temp_modifier in self.owner.temporary_modifiers:
+                if not temp_modifier.modifier in used_modifiers_list:
+                    modifier.set([temp_modifier.modifier],self.owner)
+                    used_modifiers_list.append(temp_modifier.modifier)
 
 
 
@@ -78,14 +79,14 @@ class inventory:
                     self.inventory[y][x].item_data.copy(item_data)
                     self.inventory[y][x].count = amount + temp
                     del temp
-                    self.apply_modifiyers()
+                    self.apply_modifiers()
                     return True
         for y in range(self.y - 1, -1, -1):
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == None:
                     self.inventory[y][x].item_data.copy(item_data)
                     self.inventory[y][x].count = amount
-                    self.apply_modifiyers()
+                    self.apply_modifiers()
                     return True
         return False
 
@@ -94,7 +95,7 @@ class inventory:
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == item_name and self.inventory[y][x].count >= amount:
                     self.inventory[y][x].count -= amount
-                    self.apply_modifiyers()
+                    self.apply_modifiers()
                     return True
 
         return False
@@ -104,14 +105,14 @@ class inventory:
             for x in range(self.x):
                 if self.inventory[y][x].item_data.item_name == item_name:
                     self.inventory[y][x].remove()
-                    self.apply_modifiyers()
+                    self.apply_modifiers()
                     return True
 
         return False
 
     def remove_at(self,x,y):
         self.inventory[y][x].remove()
-        self.apply_modifiyers()
+        self.apply_modifiers()
 
     def has_item(self, item_name, amount=None):
         for y in range(self.y - 1, -1, -1):
@@ -150,23 +151,26 @@ class inventory:
                     item.remove()
 
     def convert_to_drops(self, game):
+        lootable_list = []
         for row in self.inventory:
             for items in row:
                 if items.item_data.item_name != None:
-                    game.drops.append(item(game, self.owner.rect.center, items.count, items.item_data))
+                    lootable_list.append(lootable(items.item_data,items.count))
+        if lootable_list != []:
+            game.objects.append(objects.object(game,self.owner.rect.rect.center,self.owner.rect.dimension,objects.object_data("grave",lootable_list)))
         self.clear_inventory()
 
     def drop(self,x,y,game):
         if self.inventory[y][x].item_data.item_name != None:
-            game.drops.append(item(game, (self.owner.rect.x + 30, self.owner.rect.y + 30), self.inventory[y][x].count,self.inventory[y][x].item_data))
+            game.drops.append(item(game, (self.owner.rect.rect.x + 30, self.owner.rect.rect.y + 30),self.owner.rect.dimension, self.inventory[y][x].count,self.inventory[y][x].item_data))
             self.remove_at(x,y)
-            self.apply_modifiyers()
+            self.apply_modifiers()
 
     def clear_inventory(self):
         for x in range(self.x):
             for y in range(self.y):
                 self.inventory[x][y] = inventory_item(default.get_material(None), 0)
-        self.apply_modifiyers()
+        self.apply_modifiers()
 
     def copy(self,other):
         self.inventory = other.inventory
@@ -176,15 +180,15 @@ class inventory:
         self.has_modifiers = other.has_modifiers
 
 class item(pygame.sprite.Sprite):
-    def __init__(self, game, pos, count, itemdata):
+    def __init__(self, game, pos,dimension, count, itemdata):
         super().__init__(game.camera_group)
         self.count = count
         self.path = f'assets/items/{itemdata.item_name}'
-        self.image = default.load_image(self.path)
+        self.image = default.image(self.path)
         self.item_data = item_data(None)
         self.cooldown = 0
         self.item_data.copy(itemdata)
-        self.rect = self.image.get_rect(topleft=(pos[0],pos[1]))
+        self.rect = self.image.get_rect((pos[0],pos[1]),dimension)
 
     def remove(self):
         self.rect = None
@@ -220,12 +224,12 @@ class item(pygame.sprite.Sprite):
 
 
 class item_data:
-    def __init__(self, item_name, max=32, modifiyers=[modifiyer("damage", 1), modifiyer("attack_cooldown", 0.5)], tool_type=None, color=None, event=None):
+    def __init__(self, item_name, max=32, modifiers=[modifier("damage", 1), modifier("attack_cooldown", 0.5)], tool_type=None, color=None, event=None):
         self.tool_type = tool_type
         self.event = event
         if self.event != None:
             self.event = textwrap.dedent(self.event)
-        self.modifiyers = modifiyers
+        self.modifiers = modifiers
         self.item_name = item_name
         self.max = max
         self.color = color
@@ -233,7 +237,7 @@ class item_data:
     def copy(self,other):
         self.event = other.event
         self.tool_type = other.tool_type
-        self.modifiyers = other.modifiyers
+        self.modifiers = other.modifiers
         self.item_name = other.item_name
         self.max = other.max
         self.color = other.color

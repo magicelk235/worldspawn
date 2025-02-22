@@ -1,20 +1,29 @@
 import gif_pygame, pygame, random,items,gui,default,math,objects,projectiles,pickle
 
-import modifiyers
+import modifiers
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, game):
+    def close(self):
+        self.health_display.close()
+        self.hotbar.close()
+        self.block_selector.close()
+        self.crafting_gui.remove()
+        self.inventory_display.close()
+
+        self.image = None
+
+    def __init__(self, pos,dimension, game):
         super().__init__(game.camera_group)
         self.keys = ()
         self.events = []
         self.mouse = pygame.mouse.get_pos()
         self.path = 'assets/entities/player_left_idle'
-        self.image = default.load_image(self.path)
-        self.rect = self.image.get_rect(topleft=pos)
+        self.image = default.image(self.path)
+        self.rect = self.image.get_rect(pos,dimension)
         self.direction = pygame.math.Vector2()
         self.face_direction = "left"
-        self.block_selector = gui.block_selector(pos,game,self)
+        self.block_selector = gui.block_selector(pos,dimension,game,self)
         self.crafting_gui = gui.crafting_gui(game,self)
 
         self.speed = 4
@@ -34,8 +43,8 @@ class Player(pygame.sprite.Sprite):
         self.attack_c = 0.0
         self.roll_c = 0
         self.action = "idle"
-        self.temporary_modifiyers = []
-        self.render = pygame.Rect(100,100,1200,800)
+        self.temporary_modifiers = []
+        self.render = default.rect(pygame.Rect(100,100,1200,800),dimension)
 
         self.inventory = items.inventory(5,5,self,True)
         self.hotbar = gui.hotbar(self,game)
@@ -44,13 +53,14 @@ class Player(pygame.sprite.Sprite):
         self.gui_open = False
         self.inventory.clear_inventory()
         self.inventory.add_item(default.get_material('health_potion'), 16)
-        self.inventory.add_item(default.get_material('speed_potion'), 16)
-        self.inventory.add_item(default.get_material('strength_potion'), 16)
+        self.inventory.add_item(default.get_material('stick1'), 1)
+        self.inventory.add_item(default.get_material('wood_cube'), 32)
         self.inventory.add_item(default.get_material('phoenix_feather'), 1)
         self.inventory.add_item(default.get_material('iron_horse'), 1)
         self.inventory.add_item(default.get_material('mega_shield'), 1)
+        self.inventory.add_item(default.get_material('door'), 1)
         self.inventory_display = gui.inventory(game,player=self)
-        self.attack_c_text = gui.text(self.hotbar.rect.center+pygame.math.Vector2(100,0),13,self.attack_c,game.camera_group,player=self)
+        self.attack_c_text = gui.text(self.hotbar.rect.rect.center+pygame.math.Vector2(100,0),dimension,24,self.attack_c,game.camera_group,player=self)
 
     def from_dict(self,path,id):
         with open(f"{path}/players/{id}.pkl","rb") as f:
@@ -80,15 +90,16 @@ class Player(pygame.sprite.Sprite):
     def input(self, game):
 
         # render
-        self.render.x = self.rect.x - 600
-        self.render.y = self.rect.y - 400
+        self.render.rect.x = self.rect.rect.x - 600
+        self.render.rect.y = self.rect.rect.y - 400
+        self.render.dimension = self.rect.dimension
         # inventory check
         self.hotbar.updator()
-        for modifiyer in self.temporary_modifiyers:
-            if modifiyer.updator(game):
-                self.temporary_modifiyers.remove(modifiyer)
-                del modifiyer
-                self.inventory.apply_modifiyers()
+        for modifier in self.temporary_modifiers:
+            if modifier.updator(game):
+                self.temporary_modifiers.remove(modifier)
+                del modifier
+                self.inventory.apply_modifiers()
 
         # death check
         if self.health <= 0:
@@ -99,7 +110,7 @@ class Player(pygame.sprite.Sprite):
                 self.direction.x = 0
                 self.direction.y = 0
                 self.action = "dead"
-            if self.image.frame == 12:
+            if self.image.image.frame == 12:
                 try:
                     self.ride_target.ridden = False
                     self.ride_target.rider = None
@@ -113,11 +124,12 @@ class Player(pygame.sprite.Sprite):
                 self.crafting_gui.close()
                 self.ride_target = None
 
-                self.rect.x = 3001
-                self.rect.y = 3008
+                self.rect.rect.x = 3001
+                self.rect.rect.y = 3008
+                self.rect.dimension = "world"
                 self.health = 10
                 self.action = "idle"
-                self.inventory.apply_modifiyers()
+                self.inventory.apply_modifiers()
                 self.speed = 4
 
 
@@ -132,10 +144,10 @@ class Player(pygame.sprite.Sprite):
             elif self.face_direction == "right":
                 self.direction.x = 1
             self.block_selector.moving()
-            if self.image.frame >= 9:
+            if self.image.image.frame >= 9:
                 self.action = "idle"
                 self.default_speed -= 3
-                self.inventory.apply_modifiyers(False)
+                self.inventory.apply_modifiers(False)
         # walk
         elif not self.gui_open and self.action != "dead":
             self.direction.x = 0
@@ -176,12 +188,12 @@ class Player(pygame.sprite.Sprite):
                     self.action = "roll"
 
                     self.default_speed += 3
-                    self.inventory.apply_modifiyers(False)
+                    self.inventory.apply_modifiers(False)
             self.block_selector.moving()
         # inventory update
         elif self.gui_open:
-            self.block_selector.rect.y = 1204567890
-            self.block_selector.rect.x = 1204567890
+            self.block_selector.rect.rect.y = 1204567890
+            self.block_selector.rect.rect.x = 1204567890
             self.inventory_display.updator(game,self.inventory)
             self.direction.x = 0
             self.direction.y = 0
@@ -189,7 +201,7 @@ class Player(pygame.sprite.Sprite):
         if self.action not in self.path or self.animation_direction not in self.path:
 
             self.path = f'assets/entities/player_{self.animation_direction}_{self.action}'
-            self.image = default.load_image(self.path)
+            self.image.replace_path(self.path)
 
         # event listener
 
@@ -200,22 +212,15 @@ class Player(pygame.sprite.Sprite):
                     exec(self.hand.item_data.event,{},{"self":self,"game":game,"event":event})
 
                 if "_sword" in str(self.hand.item_data.tool_type) and self.attack_c == self.attack_cooldown and event.type == pygame.MOUSEBUTTONDOWN:
-
                     if event.button == 1:
-
                         for player in game.players:
-
                             if player == self:
-
                                 continue
                             if self.block_selector.rect != None and player.rect.colliderect(self.block_selector.rect):
-
                                 player.apply_damage(self.damage, game, self)
                                 self.attack_c = 0
                                 break
                 if event.type == pygame.KEYDOWN:
-
-
                     if event.key == pygame.K_e and self.action != "roll":
                         self.direction.x = 0
                         self.direction.y = 0
@@ -235,14 +240,14 @@ class Player(pygame.sprite.Sprite):
                     if self.attack_cooldown != self.attack_c:
                         self.attack_cooldown = default.round_dec(self.attack_cooldown)
                         self.attack_c += 0.1
-
                         self.attack_c_text.set_text(default.round_dec(self.attack_cooldown-self.attack_c))
 
 
     def updator(self,game):
         self.input(game)
 
-        self.rect.topleft += self.direction * self.speed
+        self.rect.rect.topleft += self.direction * self.speed
+
 
 
         if self.health < 0:
@@ -252,36 +257,35 @@ class Player(pygame.sprite.Sprite):
         self.health_display.updator(self)
         if self.ride_target != None and self.action == "ride":
             try:
-                self.ride_target.rect.topleft = (self.rect.x, self.rect.y + 4)
+                self.ride_target.rect.rect.topleft = (self.rect.rect.x, self.rect.rect.y + 4)
+                self.ride_target.rect.dimension = self.rect.dimension
                 if self.ride_target.direction == "left":
-                    self.ride_target.rect.x -= 5
+                    self.ride_target.rect.rect.x -= 5
             except:
                 self.ride_target = None
                 self.action = "idle"
-        self.attack_c_text.rect.center = self.hotbar.rect.center + pygame.math.Vector2(100, 0)
+        self.attack_c_text.rect.rect.center = self.hotbar.rect.rect.center + pygame.math.Vector2(100, 0)
+        self.attack_c_text.rect.dimension = self.rect.dimension
+        self.block_selector.rect.dimension = self.rect.dimension
+        self.hotbar.selector.rect.dimension = self.rect.dimension
         if not self.gui_open and self.direction != [0,0]:
-            self.block_selector.rect.x += self.speed * self.direction.x
-            self.block_selector.rect.y += self.speed * self.direction.y
+            self.block_selector.rect.rect.topleft += self.speed * self.direction
 
-            self.hotbar.rect.y += self.speed * self.direction.y
-            self.hotbar.rect.x += self.speed * self.direction.x
-            self.attack_c_text.rect.topleft += self.speed * self.direction
+
+            self.hotbar.rect.rect.topleft += self.speed * self.direction
+
+            self.attack_c_text.rect.rect.topleft += self.speed * self.direction
+
             if self.hotbar.selector != None and self.hotbar.selector.rect != None:
-                self.hotbar.selector.rect.y += self.speed * self.direction.y
-                self.hotbar.selector.rect.x += self.speed * self.direction.x
-            for x in range(5):
-                self.hotbar.display_array[x].rect.x += self.speed * self.direction.x
-                self.hotbar.display_array[x].rect.y += self.speed * self.direction.y
-                self.hotbar.display_array[x].text.rect.topleft += self.speed * self.direction
+                self.hotbar.selector.rect.rect.topleft += self.speed * self.direction
 
-    def close(self):
-        self.health_display.close()
-        self.hotbar.close()
-        self.block_selector.close()
-        self.crafting_gui.remove()
-        self.inventory_display.close()
 
-        self.image = None
+        for x in range(5):
+            self.hotbar.display_array[x].text.rect.dimension = self.rect.dimension
+            self.hotbar.display_array[x].rect.rect.topleft += self.speed * self.direction
+            self.hotbar.display_array[x].rect.dimension = self.rect.dimension
+            self.hotbar.display_array[x].text.rect.rect.topleft += self.speed * self.direction
+
 
 class breed:
     def __init__(self,item_name,duplicate=False,cooldown=60*2,amount=1):
@@ -347,7 +351,7 @@ class kill_spawn:
         self.amount = amount
 
 class entity(pygame.sprite.Sprite):
-    def __init__(self, game, entity_data, pos, tag=None):
+    def __init__(self, game, entity_data, pos,dimension, tag=None):
         super().__init__(game.camera_group)
         # entity info
         self.entity_data = entity_data #
@@ -360,7 +364,7 @@ class entity(pygame.sprite.Sprite):
         # H attack
         # N attack when attacked
         # L loyal
-        self.vision_rect = pygame.Rect(pos[0],pos[1],self.entity_data.vision,self.entity_data.vision) #
+        self.vision_rect = default.rect(pygame.Rect(pos[0],pos[1],self.entity_data.vision,self.entity_data.vision),dimension)
 
         self.regeneration_time = 0
 
@@ -398,8 +402,8 @@ class entity(pygame.sprite.Sprite):
             self.path = f'assets/entities/None'
         else:
             self.path = f'assets/entities/{self.entity_data.name}'
-        self.image = default.load_image(self.path)
-        self.rect = self.image.get_rect(midbottom=pos) #
+        self.image = default.image(self.path)
+        self.rect = self.image.get_rect(pos,dimension) #
         self.flipped = False
         # move
         self.created_path = False
@@ -409,7 +413,7 @@ class entity(pygame.sprite.Sprite):
         self.path_point = 0
         self.max_path_point = 0
 
-        self.temporary_modifiyers = []
+        self.temporary_modifiers = []
         
         self.way_x = 0
         self.way_y = 0
@@ -431,16 +435,17 @@ class entity(pygame.sprite.Sprite):
         self.fed = False
         self.breed_target = None
 
-    def reset_modifiyers(self):
+    def reset_modifiers(self):
         self.max_health = self.entity_data.health
         self.damage = self.entity_data.attack_damage
         self.attack_cooldown = self.entity_data.attack_cooldown
-        self.shield = entity_data.shield
-        self.speed = entity_data.speed
+        self.shield = self.entity_data.shield
+        self.speed = self.entity_data.speed
 
-    def apply_modifiyers(self):
-        for temp_modifiyer in self.temporary_modifiyers:
-            modifiyers.modifiyer.set([temp_modifiyer.modifiyer],self,False,False)
+    def apply_modifiers(self):
+        self.reset_modifiers()
+        for temp_modifier in self.temporary_modifiers:
+            modifiers.modifier.set([temp_modifier.modifier],self,False,False)
 
     def to_dict(self):
         return {
@@ -450,7 +455,7 @@ class entity(pygame.sprite.Sprite):
             'vision_rect': self.vision_rect,
            'mob_type': self.mob_type,
             'despawn_time': self.despawn_time,
-           'shield': self.shield,
+            'cooldown': self.cooldown,
            'rect': self.rect,
            'path': self.path,
            'saddled': self.saddled,
@@ -464,55 +469,53 @@ class entity(pygame.sprite.Sprite):
         self.vision_rect = entity_dict["vision_rect"]
         self.mob_type = entity_dict["mob_type"]
         self.despawn_time = entity_dict["despawn_time"]
-        self.shield = entity_dict["shield"]
         self.rect = entity_dict["rect"]
         self.path = entity_dict["path"]
-        self.image = default.load_image(self.path)
+        self.image.replace_path(self.path)
         self.saddled = entity_dict["saddled"]
+        self.cooldown = entity_dict["cooldown"]
         self.entity_data = entity_dict["entity_data"]
-        self.reset_modifiyers()
+        self.reset_modifiers()
 
     def updator(self, game):
-
-        for modifiyer in self.temporary_modifiyers:
-            if modifiyer.updator(game):
-                self.temporary_modifiyers.remove(modifiyer)
-                del modifiyer
-                self.apply_modifiyers()
+        for modifier in self.temporary_modifiers:
+            if modifier.updator(game):
+                self.temporary_modifiers.remove(modifier)
+                del modifier
+                self.apply_modifiers()
         # breed target finder
         if self.entity_data.breed != None:
             if self.fed and self.breed_target == None:
                 if self.entity_data.breed.duplicate:
                     for i in range(self.entity_data.breed.amount):
                         game.entities.append(
-                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.center))
+                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.rect.center,self.rect.dimension))
                     self.fed = False
                 else:
                     closest = 10000000000000000
                     for Entity in game.entities:
                         if Entity != self:
                             if Entity.fed and Entity.entity_data.name == self.entity_data.name:
-                                if closest > math.sqrt(2**(self.rect.x-Entity.rect.x) + (self.rect.y-Entity.rect.y) ** 2):
-                                    closest = math.sqrt(2**(self.rect.x-Entity.rect.x) + (self.rect.y-Entity.rect.y) ** 2)
+                                if closest > math.sqrt(2**(self.rect.rect.x-Entity.rect.rect.x) + (self.rect.rect.y-Entity.rect.rect.y) ** 2):
+                                    closest = math.sqrt(2**(self.rect.rect.x-Entity.rect.rect.x) + (self.rect.rect.y-Entity.rect.rect.y) ** 2)
                                     self.breed_target = Entity
         # death check
         if self.health <= 0:
             if self.entity_data.kill_spawn != None:
                 for i in range(self.entity_data.kill_spawn.amount):
-                    game.entities.append(entity(game, default.get_entity(self.entity_data.kill_spawn.name),(self.rect.x + random.randint(-50, 50), self.rect.y + random.randint(-50, 50))))
+                    game.entities.append(entity(game, default.get_entity(self.entity_data.kill_spawn.name),(self.rect.rect.x + random.randint(-50, 50), self.rect.rect.y + random.randint(-50, 50)),self.rect.dimension))
                     game.entities[-1].attacker = self.attacker
             if self.entity_data.lootable_list != [] and self.entity_data.lootable_list != [None]:
                 for i in range(len(self.entity_data.lootable_list)):
                     if random.random() < self.entity_data.lootable_list[i].chance:
                         game.drops.append(
-                            items.item(game, self.rect.center, self.entity_data.lootable_list[i].count,
+                            items.item(game, self.rect.rect.center,self.rect.dimension, self.entity_data.lootable_list[i].count,
                                         self.entity_data.lootable_list[i].loot_data))
             if self.ridden:
                 self.stop_riding()   
             # soul drop check
-            
             if isinstance(self.attacker,Player) and "_soul" in str(self.attacker.hand.item_data.tool_type):
-                game.drops.append(items.item(game, self.rect.center, 1, default.get_material("soul")))
+                game.drops.append(items.item(game, self.rect.rect.center,self.rect.dimension, 1, default.get_material("soul")))
             return True
         try:
             if self.attacker != None:
@@ -529,21 +532,18 @@ class entity(pygame.sprite.Sprite):
         if not self.entity_data.ignore_solid:
             for block in game.objects:
                 if block.is_solid and self.rect.colliderect(block.rect_hitbox):
-                    self.rect.topleft -= self.walk_direction
+                    self.rect.rect.topleft -= self.walk_direction
                     self.created_path = False
                     self.path_point = self.max_path_point
                     if "border" in block.name:
-                        self.rect.x = random.randint(10, 178) * 26
-                        self.rect.y = random.randint(10, 151) * 20
+                        self.rect.rect.x = random.randint(10, 178) * 26
+                        self.rect.rect.y = random.randint(10, 151) * 20
         # vision rect updator
-        self.vision_rect.center = self.rect.center
-
+        self.vision_rect.rect.center = self.rect.rect.center
+        self.vision_rect.dimension = self.rect.dimension
         # tame
         if self.entity_data.tame != None:
             self.entity_data.tame.updator(self,game)
-
-
-
         if self.attacker != None and self.attacker.rect != None:
             # thrower
             if self.entity_data.thrower != None and self.vision_rect.colliderect(self.attacker.rect):
@@ -558,22 +558,18 @@ class entity(pygame.sprite.Sprite):
                     self.attacker.apply_damage(self.entity_data.attack_damage,game,self)
                     if self.entity_data.suicide:
                         return True
-        # events
-
         for event in game.event_list:
-            for modifiyer in self.temporary_modifiyers:
-                if modifiyer.updator(game):
-                    self.temporary_modifiyers.remove(modifiyer)
-                    del modifiyer
-                    self.apply_modifiyers()
+            for modifier in self.temporary_modifiers:
+                if modifier.updator(game):
+                    self.temporary_modifiers.remove(modifier)
+                    del modifier
+                    self.apply_modifiers()
             if event.type == pygame.USEREVENT:
                 # cooldowns
                 self.cooldown += 1
                 if self.entity_data.breed != None and self.breed_cooldown <= self.entity_data.breed.cooldown:
                     self.breed_cooldown += 1
-
                 self.attack_c += 1
-
                 if self.health < self.entity_data.health:
                     self.regeneration_time += 1
                 if self.despawn_time != -1:
@@ -591,7 +587,7 @@ class entity(pygame.sprite.Sprite):
                         # attack check
                         if player.block_selector.rect != None and self.rect.colliderect(player.block_selector.rect):
                             if self.saddled == True and self.entity_data.ride_data.needed_item != None:
-                                game.drops.append(items.item(game, self.rect.center, 1,default.get_material(self.entity_data.ride_data.needed_item)))
+                                game.drops.append(items.item(game, self.rect.rect.center,self.rect.dimension, 1,default.get_material(self.entity_data.ride_data.needed_item)))
                                 self.saddled = False
                             if "_sword" in str(player.hand.item_data.tool_type) and player.attack_c == player.attack_c:
                                 player.attack_c = 0
@@ -618,20 +614,17 @@ class entity(pygame.sprite.Sprite):
                             elif player.hand.item_data.item_name == self.entity_data.ride_data.needed_item:
                                 self.saddled = True
                                 player.hand.count -= 1
-
         if self.ridden:
             self.rider.action = "ride"
-
-
             if "d" in self.rider.keys:
                 self.direction = "right"
                 if not self.flipped:
-                    self.image = default.flip(self.image, True)
+                    self.image.flip( True)
                     self.flipped = True
             elif "a" in self.rider.keys:
                 self.direction = "left"
                 if self.flipped:
-                    self.image = default.flip(self.image,True)
+                    self.image.flip(True)
                     self.flipped = False
             if "space" in self.rider.keys or self.rider.ride_target != self:
                 self.stop_riding()
@@ -640,21 +633,21 @@ class entity(pygame.sprite.Sprite):
             for player in game.players:
                 # random walking/waking to player
                 if self.entity_data.breed != None and player.hand != None and player.hand.item_data.item_name == self.entity_data.breed.item_name:
-                    self.walk_location(game,player.rect.x,player.rect.y)
+                    self.walk_location(game,player.rect.rect.x,player.rect.rect.y,player.rect.dimension)
                 elif self.attacker != None and self.attacker.rect != None and self.vision_rect.colliderect(self.attacker.rect):
-                    self.walk_location(game,self.attacker.rect.centerx,self.attacker.rect.centery)
+                    self.walk_location(game,self.attacker.rect.rect.centerx,self.attacker.rect.rect.centery,self.attacker.rect.dimension)
                 elif self.mob_type == "L":
                     player_loyal = default.get_player(game.players,self.tag)
                     if player_loyal != None and player_loyal.attacker != None and player_loyal.attacker.rect != None:
                         self.attacker = player_loyal.attacker
                     else:
-                        self.walk_location(game,player_loyal.rect.x,player_loyal.rect.y)
+                        self.walk_location(game,player_loyal.rect.rect.x,player_loyal.rect.rect.y,player_loyal.rect.dimension)
                 else:
                     self.random_walking(game)
             # breed system
         else:
             try:
-                self.walk_location(game, self.breed_target.rect.x, self.breed_target.rect.y)
+                self.walk_location(game, self.breed_target.rect.rect.x, self.breed_target.rect.rect.y,self.breed_target.rect.dimension)
                 if self.rect.colliderect(self.breed_target.rect):
                     self.fed = False
                     self.breed_target.fed = False
@@ -664,7 +657,7 @@ class entity(pygame.sprite.Sprite):
                     self.breed_target = None
                     for i in range(self.entity_data.breed.amount):
                         game.entities.append(
-                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.center))
+                            entity(game.camera_group, default.get_entity(self.entity_data.name), self.rect.rect.center,self.rect.dimension))
             except:
                 self.breed_target = None
         # trade menu
@@ -682,48 +675,48 @@ class entity(pygame.sprite.Sprite):
                         self.crafting_menu_open = False
                         self.trade_menu_user = None
 
-    def walking_solid(self, game, x,y):
-        if not self.created_path and not self.rect.collidepoint(x,y) and not self.cant_walk:
-            if self.vision_rect.collidepoint(x,y):
+    def walking_solid(self, game, x,y,dimension):
+        if not self.created_path and not self.rect.collidepoint(x,y,dimension) and not self.cant_walk:
+            if self.vision_rect.collidepoint(x,y,dimension):
                 if not (self.path_point < self.max_path_point):
-                    self.walking_path = default.calculate_path(self.rect.topleft, (x,y), game.objects, self.rect.width, self.rect.height, 200,self.speed*2)
+                    self.walking_path = default.calculate_path(self.rect.rect.topleft, (x,y), game.objects, self.rect.rect.width, self.rect.rect.height, 200,self.speed*2)
                     if not self.walking_path:
                         self.cant_walk = True
                     else:
 
                         self.path_point = 0
                         self.max_path_point = len(self.walking_path) - 1
-                        self.angle = (math.degrees(math.atan2(-(self.rect.y - self.walking_path[self.path_point][1]),self.rect.x - self.walking_path[self.path_point][0])) + 180) % 360
+                        self.angle = (math.degrees(math.atan2(-(self.rect.rect.y - self.walking_path[self.path_point][1]),self.rect.rect.x - self.walking_path[self.path_point][0])) + 180) % 360
 
 
                 else:
-                    self.created_path = Trued
-        elif not self.rect.collidepoint(x,y) and not self.cant_walk:
+                    self.created_path = True
+        elif not self.rect.collidepoint(x,y,dimension) and not self.cant_walk:
             radians = abs(math.radians(self.angle))
             self.walk_direction.x = self.speed * math.cos(radians)
             self.walk_direction.y = - (self.speed * math.sin(radians))
-            self.rect.topleft += self.walk_direction
+            self.rect.rect.topleft += self.walk_direction
 
             if 90 < self.angle < 270:
                 if self.flipped:
-                    self.image = default.flip(self.image,True)
+                    self.image.flip(True)
                     self.flipped = False
             elif not self.flipped:
-                self.image = default.flip(self.image,True)
+                self.image.flip(True)
                 self.flipped = True
-            if self.path_point < self.max_path_point and default.almost(self.rect.topleft,self.walking_path[self.path_point],self.speed*1.5):
+            if self.path_point < self.max_path_point and default.almost(self.rect.rect.topleft,self.walking_path[self.path_point],self.speed*1.5):
                 if not self.walking_path:
                     self.cant_walk = True
                 else:
                     self.path_point += 1
-                    self.angle = (math.degrees(math.atan2(-(self.rect.y-self.walking_path[self.path_point][1]),self.rect.x-self.walking_path[self.path_point][0]))+180) % 360
+                    self.angle = (math.degrees(math.atan2(-(self.rect.rect.y-self.walking_path[self.path_point][1]),self.rect.rect.x-self.walking_path[self.path_point][0]))+180) % 360
 
 
             else:
                 self.cooldown = 0
                 self.created_path = False
 
-    def walk_location(self,game,x,y):
+    def walk_location(self,game,x,y,dimension):
         if not self.cant_walk:
             collide = False
             if not self.entity_data.ignore_solid:
@@ -732,34 +725,34 @@ class entity(pygame.sprite.Sprite):
                     if object.is_solid and self.vision_rect.colliderect(object.rect):
                         collide = True
             if collide:
-                self.walking_solid(game, x, y)
+                self.walking_solid(game, x, y,dimension)
             else:
-                self.walking_ignore_solid(x,y)
+                self.walking_ignore_solid(x,y,dimension)
         elif self.cooldown > 20:
             self.cooldown = 0
             self.cant_walk = False
 
-    def walking_ignore_solid(self, x, y):
+    def walking_ignore_solid(self, x, y,dimension):
         if not self.created_path:
-            self.angle = (math.degrees(math.atan2(-(self.rect.y-y),self.rect.x-x))+180) % 360
+            self.angle = (math.degrees(math.atan2(-(self.rect.rect.y-y),self.rect.rect.x-x))+180) % 360
             self.created_path = True
         else:
-            if self.vision_rect.collidepoint(x, y):
+            if self.vision_rect.collidepoint(x, y,dimension):
                 radians = abs(math.radians(self.angle))
                 self.walk_direction.x = self.speed * math.cos(radians)
                 self.walk_direction.y = -(self.speed * math.sin(radians))
-                self.rect.topleft += self.walk_direction
+                self.rect.rect.topleft += self.walk_direction
                 if 90 < self.angle < 270:
                     if self.flipped:
-                        self.image = default.flip(self.image,True)
+                        self.image.flip(True)
                         self.flipped = False
                 elif not self.flipped:
-                    self.image = default.flip(self.image,True)
+                    self.image.flip(True)
                     self.flipped = True
                 del radians
-            location_check = pygame.Rect(x,y,10,10)
+            location_check = default.rect(pygame.Rect(x,y,10,10),dimension)
             
-            if not location_check.collidepoint(self.way_x * self.walk_direction.x,self.way_y * self.walk_direction.y) or default.is_point_on_line(self.path[self.path_point][0],self.path[self.path_point][0],self.angle,x,y):
+            if not location_check.collidepoint(self.way_x * self.walk_direction.x,self.way_y * self.walk_direction.y,dimension) or default.is_point_on_line(self.path[self.path_point][0],self.path[self.path_point][0],self.angle,x,y):
                 self.created_path = False
                 self.cooldown = 0
             del location_check
@@ -769,8 +762,8 @@ class entity(pygame.sprite.Sprite):
             if self.cooldown > 20:
                 attempts = 0
                 while True:
-                    self.random_x = random.randint(self.vision_rect.left+(self.vision_rect.width//4),self.vision_rect.right-(self.vision_rect.width//4))
-                    self.random_y = random.randint(self.vision_rect.top+(self.vision_rect.height//4),self.vision_rect.bottom-(self.vision_rect.height//4))
+                    self.random_x = random.randint(self.vision_rect.rect.left+(self.vision_rect.rect.width//4),self.vision_rect.rect.right-(self.vision_rect.rect.width//4))
+                    self.random_y = random.randint(self.vision_rect.rect.top+(self.vision_rect.rect.height//4),self.vision_rect.rect.bottom-(self.vision_rect.rect.height//4))
                     self.random_path = True
                     attempts += 1
                     if self.random_y > 0 and self.random_x > 0:
@@ -779,8 +772,8 @@ class entity(pygame.sprite.Sprite):
                         self.cooldown = 0
                         break
         else:
-            self.walk_location(game,self.random_x,self.random_y)
-            if self.random_x - 10 < self.rect.x < self.random_x + 10 and self.random_y - 10 < self.rect.y < self.random_y + 10:
+            self.walk_location(game,self.random_x,self.random_y,self.rect.dimension)
+            if self.random_x - 10 < self.rect.rect.x < self.random_x + 10 and self.random_y - 10 < self.rect.rect.y < self.random_y + 10:
                 self.random_path = False
 
     def render(self,players):
@@ -798,19 +791,19 @@ class entity(pygame.sprite.Sprite):
                 for Entity in default.double_tag_list(game.entities,self.tag,self.id):
                     Entity.attacker = attacker
         if self.direction == "left":
-            self.rect.x += self.entity_data.knockback + self.speed
+            self.rect.rect.x += self.entity_data.knockback + self.speed
             self.direction = "right"
             self.cooldown = 40
         elif self.direction == "right":
-            self.rect.x -= self.entity_data.knockback + self.speed
+            self.rect.rect.x -= self.entity_data.knockback + self.speed
             self.direction = "left"
             self.cooldown = 40
         if self.direction == "up":
-            self.rect.y += self.entity_data.knockback + self.speed
+            self.rect.rect.y += self.entity_data.knockback + self.speed
             self.direction = "down"
             self.cooldown = 40
         elif self.direction == "down":
-            self.rect.y -= self.entity_data.knockback + self.speed
+            self.rect.rect.y -= self.entity_data.knockback + self.speed
             self.direction = "up"
             self.cooldown = 40
 

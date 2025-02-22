@@ -1,4 +1,4 @@
-import socket,pygame,gui,random,events,default,entities,objects,items,threading,pickle,os
+import socket,pygame,gui,random,events,default,entities,objects,items,threading,pickle,os,world_generation,cv2
 
 class server:
     def __init__(self,path):
@@ -18,7 +18,7 @@ class server:
         self.new_players = []
         pygame.display.set_caption(f"WorldSpawn Code:{default.encrypt(self.get_local_ip())}")
         pygame.display.set_icon(pygame.image.load(default.resource_path("assets/gui/world_icon.png")))
-        self.players = [entities.Player((3001, 3008), self)]
+        self.players = [entities.Player((0, 0),"world", self)]
 
         self.owner = self.players[0]
         self.update_data = []
@@ -30,7 +30,71 @@ class server:
         self.drops = []
         self.events = []
         self.projectiles = []
-        self.potion_clouds = []
+        self.particles = []
+        chunk_data = {"objects":[
+            {"name":"tree_cherry","percent":1/3,"min":1,"max":3},
+            {"name":"tree_oak","percent":1/3,"min":1,"max":3},
+            {"name":"tree_spruce","percent":1/3,"min":1,"max":3},
+            {"name":"bush","percent":1/2,"min":1,"max":3},
+
+            {"name":"twig","percent":1/4,"min":1,"max":2},
+            {"name":"rock","percent":1,"min":0,"max":2},
+
+            {"name":"sand_temple","percent":1/50,"min":1,"max":1},
+            {"name":"olympos","percent":1/50,"min":1,"max":1},
+            {"name":"defence_tower","percent":1/50,"min":1,"max":1},
+            {"name":"ruined_village","percent":1/50,"min":1,"max":1},
+            {"name":"knight_tower","percent":1/50,"min":1,"max":1},
+            {"name":"cursed_olympos","percent":1/50,"min":1,"max":1},
+            {"name":"ship","percent":1/50,"min":1,"max":1},
+
+            {"name": "flower_blue", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "flower_green", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "flower_red", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "flower_white", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "flower_black", "percent": 1 / 3, "min": 1, "max": 2},
+
+            {"name": "wheat", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "potato", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "carrot", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "tomato", "percent": 1 / 3, "min": 1, "max": 2},
+            {"name": "pumpkin", "percent": 1 / 3, "min": 1, "max": 2},
+
+            {"name": "lake", "percent": 1 / 7, "min": 0, "max": 2},
+            {"name": "cliff", "percent": 1 / 7, "min": 0, "max": 2},
+            {"name": "mini_cliff", "percent": 1 / 7, "min": 0, "max": 2},
+            {"name": "cave", "percent": 1 / 6, "min": 1, "max": 2},
+
+        ]
+
+,"entities":[
+            {"name":"cow","percent":1/8,"min":0,"max":2},
+            {"name":"lion","percent":1/8,"min":0,"max":2},
+            {"name":"chicken","percent":1/8,"min":0,"max":2},
+            {"name":"horse","percent":1/8,"min":0,"max":2},
+            {"name":"deer","percent":1/8,"min":0,"max":2},
+            {"name":"duck","percent":1/8,"min":0,"max":2},
+            {"name":"pig","percent":1/8,"min":0,"max":2},
+            {"name":"goat","percent":1/8,"min":0,"max":2},
+            {"name":"dog","percent":1/8,"min":0,"max":2},
+            {"name":"sheep","percent":1/8,"min":0,"max":2},
+            ],
+        "caves":[]}
+
+        chunk_data =world_generation.chunk_data("grass",chunk_data)
+        chunk_data1 = {"objects": [{"name": "cave_rock", "percent": 0.70, "min": 1, "max": 5},
+                                   {"name": "coal_ore", "percent": 0.35, "min": 1, "max": 2},
+                                   {"name": "copper_ore", "percent": 0.30, "min": 1, "max": 2},
+                                   {"name": "iron_ore", "percent": 0.25, "min": 1, "max": 2},
+                                   {"name": "silver_ore", "percent": 0.20, "min": 1, "max": 2},
+                                   {"name": "gold_ore", "percent": 0.15, "min": 1, "max": 2},
+
+                                   {"name": "cave_wall_x", "percent": 0.5, "min": 1, "max": 5},
+                                   {"name": "cave_wall_y", "percent": 0.5, "min": 1, "max": 5},
+                                   ],"entities": [],"caves":[]}
+        chunk_data1 = world_generation.chunk_data("cave_ground", chunk_data1)
+        self.dimensions = [world_generation.dimension("world",chunk_data),world_generation.dimension("cave",chunk_data1)]
+        self.events.append(events.event(self, events.event_data(1, 10 ** 60, "night", "night",["zombie", "skeleton", "troll", "ogre", "fungal","cyclops", "caveman", "witch", "stone_golem"],summon_delay=6,dimension="cave")))
         self.events.append(events.event(self, events.event_data(5 * 60, 2.5 * 60, "night", "night",
                                                                 ["zombie", "skeleton", "troll", "ogre", "fungal",
                                                                  "cyclops", "caveman", "witch", "stone_golem"])))
@@ -41,10 +105,11 @@ class server:
         self.events.append(events.event(self, events.event_data(10 * 60, 2.5 * 60, "rain", "rain",
                                                                 ["water_golem", "tornado", "water_golem_mini",
                                                                  "tornado_mini"], summon_delay=6)))
+        self.objects.append(objects.object(self, (2954-3008, 2970-3003), "world", default.get_object("spawn0")))
         try:
             self.recover()
         except:
-            self.world_gen()
+            pass
 
     def get_local_ip(self):
         try:
@@ -63,24 +128,6 @@ class server:
         with open(f"{self.path}/events.pkl","wb") as file:
             pickle.dump(events_list,file)
 
-        entities_list = []
-        for entity in self.entities:
-            entities_list.append(entity.to_dict())
-        with open(f"{self.path}/entities.pkl","wb") as file:
-            pickle.dump(entities_list,file)
-
-        objects_list = []
-        for object in self.objects:
-            objects_list.append(object.to_dict())
-        with open(f"{self.path}/objects.pkl", "wb") as file:
-            pickle.dump(objects_list, file)
-
-        caves_list = []
-        for cave in self.caves:
-            caves_list.append(cave.to_dict())
-        with open(f"{self.path}/caves.pkl", "wb") as file:
-            pickle.dump(caves_list, file)
-
         if not os.path.exists(f"{self.path}/players"):
             os.mkdir(f"{self.path}/players")
         for player in self.players:
@@ -91,6 +138,8 @@ class server:
         server_data = [self.banned_players,self.owner.id]
         with open(f"{self.path}/server_data.pkl", "wb") as file:
             pickle.dump(server_data, file)
+        for dimension in self.dimensions:
+            dimension.save(self)
 
     def handle_client(self,conn, addr):
         print(f"New connection: {addr}")
@@ -108,62 +157,13 @@ class server:
                         raise Exception("no data received from client")
                     data = default.unserialize_pygame_inputs(data)
                     self.update_data.append([player]+data)
-                    send_data = [self.camera_group.to_dict(player),{"rect":player.rect,"image":default.to_bytes(player.image),"size":player.image.get_size()}]
-                    default.send_msg(conn,send_data)
+                    screen = self.camera_group.to_dict(player)
+                    default.send_surface(conn,screen)
         except Exception as e:
             print(e)
             print(f"Connection lost: {addr}")
             conn.close()
             self.remove_player_list.append(player)
-
-    def world_gen(self):
-
-        self.objects.append(objects.object(self, (2954, 2970), default.get_object("spawn0")))
-        self.caves.append(objects.cave((3100, 3100), self, 15, self.objects))
-        used_places = []
-        for i in range(400):
-            print(i)
-            random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-            self.objects.append(objects.object(self, random_place,default.get_object("rock")))
-            if i < 180:
-                for name in ["tree_white","tree_swirling","tree_willow","tree_cherry","tree_oak","tree_spruce","bush","twig"]:
-                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                    if self.objects[-1].data.plant_data != None:
-                        self.objects[-1].stage = self.objects[-1].data.plant_data.max_stage
-            if i < 100:
-                for name in ["pumpkin","tomato","potato","carrot","wheat","flower_red","flower_white","flower_blue","flower_green","flower_black"]:
-                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
-                    if self.objects[-1].data.plant_data != None:
-                        self.objects[-1].stage = self.objects[-1].data.plant_data.max_stage
-            if i < 50:
-                for name in ["lake","cliff","mini_cliff"]:
-                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
-
-            if i < 12:
-                for name in ["goat", "cow", "pig", "sheep", "chicken", "duck", "deer", "horse", "lion","dog"]:
-                    self.entities.append(entities.entity(self, default.get_entity(name),(random.randint(10, 178) * 32, random.randint(10, 151) * 23)))
-                random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                self.caves.append(objects.cave(random_place, self, 15, self.objects))
-
-            if i < 4:
-                for name in ["sand_temple","olympos","ruined_village","cursed_olympos","knight_tower","defence_tower","ship"]:
-                    random_place = (random.randint(4, 184) * 32, random.randint(5, 255) * 23)
-                    self.objects.append(objects.object(self, random_place, default.get_object(name)))
-
-        self.objects.append(objects.object(self, (0, 7061), default.get_object("cave_border_x")))
-        self.objects.append(objects.object(self, (0, 8020), default.get_object("cave_border_x")))
-        self.objects.append(objects.object(self, (0, 7061), default.get_object("cave_border_y")))
-        self.objects.append(objects.object(self, (959, 7061), default.get_object("cave_border_y")))
-        self.objects.append(
-            objects.object(self, (0, -529), objects.object_data("border_x", None, None, None, None, True)))
-        self.objects.append(
-            objects.object(self, (0, 6000), objects.object_data("border_x", None, None, None, None, True)))
-        self.objects.append(
-            objects.object(self, (-529, -529), objects.object_data("border_y", None, None, None, None, True)))
-        self.objects.append(objects.object(self, (6003, -529), objects.object_data("border_y", None, None, None, None, True)))
 
     def recover(self):
 
@@ -171,30 +171,6 @@ class server:
             server_data = pickle.load(file)
             self.banned_players = server_data[0]
             self.players[-1].from_dict(self.path,server_data[1])
-
-        with open(f"{self.path}/objects.pkl","rb") as file:
-            new_blocks = pickle.load(file)
-            if len(self.objects) < len(new_blocks):
-                for i in range(len(new_blocks) - len(self.objects)):
-                    self.objects.append(objects.object(self, (10, 10), default.get_object("rock")))
-            for i in range(len(new_blocks)):
-                self.objects[i].from_dict(new_blocks[i])
-
-        with open(f"{self.path}/entities.pkl","rb") as file:
-            new_entities = pickle.load(file)
-            if len(self.entities) < len(new_entities):
-                for i in range(len(new_entities) - len(self.entities)):
-                    self.entities.append(entities.entity(self, default.get_entity("cow"), (10, 10)))
-            for i in range(len(new_entities)):
-                self.entities[i].from_dict(new_entities[i])
-
-        with open(f"{self.path}/caves.pkl","rb") as file:
-            new_caves = pickle.load(file)
-            if len(self.caves) < len(new_caves):
-                for i in range(len(new_caves) - len(self.caves)):
-                    self.caves.append(objects.cave((999999,99999),self,"rock",15,self.objects))
-            for i in range(len(new_caves)):
-                self.caves[i].from_dict(new_caves[i])
 
         with open(f"{self.path}/events.pkl","rb") as file:
             new_events = pickle.load(file)
@@ -209,12 +185,16 @@ class server:
             self.event_list = self.owner.events
             self.owner.keys = pygame.key.get_pressed()
             self.owner.keys = default.get_pressed_key_names(self.owner.keys)
+            updated_payers = []
             for data in self.update_data:
-                data[0].keys = data[2]
-                data[0].events = data[1]
-                data[0].mouse = data[3]
+                if data[0] not in updated_payers:
+                    data[0].keys = data[2]
+                    data[0].events = data[1]
+                    data[0].mouse = data[3]
+                    updated_payers.append(data[0])
+                    self.update_data.remove(data)
             for id in self.new_players:
-                self.players.append(entities.Player((3001, 3008), self))
+                self.players.append(entities.Player((0, 0),"world", self))
                 if os.path.exists(f"{self.path}/players/{id}.pkl"):
                     self.players[-1].from_dict(self.path, id)
                 self.players[-1].id = id
@@ -224,7 +204,7 @@ class server:
                     self.game_running = False
             self.game_update()
             try:
-                self.camera_group.custom_draw(self.owner,True)
+                self.camera_group.server_draw(self.owner, True)
             except:
                 pass
             pygame.display.flip()
@@ -245,6 +225,7 @@ class server:
 
     def start_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         server.bind(("0.0.0.0", self.port))
         server.settimeout(5)# Bind to all network interfaces
         server.listen(5)
@@ -262,6 +243,8 @@ class server:
         server.close()
 
     def game_update(self):
+        for dimension in self.dimensions:
+            dimension.updator(self)
         for Block in self.objects:
             if Block.render(self.players):
                 if Block.updator(self):
@@ -269,12 +252,6 @@ class server:
                     self.camera_group.remove(Block)
                     Block.rect = None
                     del Block
-        for potion in self.potion_clouds:
-            if potion.render(self.players):
-                if potion.updator(self):
-                    self.potion_clouds.remove(potion)
-                    self.camera_group.remove(potion)
-                    del potion
         for Entity in self.entities:
             if Entity.render(self.players):
                 if Entity.updator(self):
@@ -282,6 +259,17 @@ class server:
                     self.camera_group.remove(Entity)
                     Entity.rect = None
                     del Entity
+        for cave in self.caves:
+            if cave.render(self.players):
+                cave.updator(self)
+
+        for particle in self.particles:
+            if particle.render(self.players):
+                if particle.updator(self):
+                    self.particles.remove(particle)
+                    self.camera_group.remove(particle)
+                    del particle
+
         for drop in self.drops:
             if drop.render(self.players):
                 if drop.updator(self):
@@ -296,9 +284,7 @@ class server:
                     del Projectile
         for event in self.events:
             event.updator(self)
-        for cave in self.caves:
-            if cave.render(self.players):
-                cave.updator(self)
+
 
         for player in self.players:
             player.updator(self)
