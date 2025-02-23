@@ -156,7 +156,9 @@ class server:
                     if not data:
                         raise Exception("no data received from client")
                     data = default.unserialize_pygame_inputs(data)
-                    self.update_data.append([player]+data)
+                    player.keys.append(data[1])
+                    player.events.append(data[0])
+                    player.mouse = data[2]
                     screen = self.camera_group.to_dict(player)
                     default.send_surface(conn,screen)
         except Exception as e:
@@ -185,14 +187,6 @@ class server:
             self.event_list = self.owner.events
             self.owner.keys = pygame.key.get_pressed()
             self.owner.keys = default.get_pressed_key_names(self.owner.keys)
-            updated_payers = []
-            for data in self.update_data:
-                if data[0] not in updated_payers:
-                    data[0].keys = data[2]
-                    data[0].events = data[1]
-                    data[0].mouse = data[3]
-                    updated_payers.append(data[0])
-                    self.update_data.remove(data)
             for id in self.new_players:
                 self.players.append(entities.Player((0, 0),"world", self))
                 if os.path.exists(f"{self.path}/players/{id}.pkl"):
@@ -288,3 +282,6 @@ class server:
 
         for player in self.players:
             player.updator(self)
+            player.keys = []
+            player.events = []
+            
