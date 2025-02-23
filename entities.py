@@ -15,7 +15,7 @@ class Player(pygame.sprite.Sprite):
 
     def __init__(self, pos,dimension, game):
         super().__init__(game.camera_group)
-        self.keys = ()
+        self.keys = []
         self.events = []
         self.mouse = pygame.mouse.get_pos()
         self.path = 'assets/entities/player_left_idle'
