@@ -14,10 +14,16 @@ class inventory_item:
         self.item_data = default.get_material(None)
         self.count = 0
 
-
     def copy(self, other):
         self.item_data.copy(other.item_data)
         self.count = other.count
+
+    def __eq__(self, other):
+        if isinstance(other,inventory_item):
+            if other.count == self.count and other.item_data == self.item_data:
+                return True
+        return False
+
 
 class inventory:
     def __init__(self,x,y,owner,has_modifiers):
@@ -60,9 +66,6 @@ class inventory:
                 if not temp_modifier.modifier in used_modifiers_list:
                     modifier.set([temp_modifier.modifier],self.owner)
                     used_modifiers_list.append(temp_modifier.modifier)
-
-
-
 
     def find_item(self, item_name):
         for x in range(self.x):
@@ -157,12 +160,12 @@ class inventory:
                 if items.item_data.item_name != None:
                     lootable_list.append(lootable(items.item_data,items.count))
         if lootable_list != []:
-            game.objects.append(objects.object(game,self.owner.rect.rect.center,self.owner.rect.dimension,objects.object_data("grave",lootable_list)))
+            default.create_object(game.objects,objects.object(game,self.owner.rect.rect.center,self.owner.rect.dimension,objects.object_data("grave",lootable_list)))
         self.clear_inventory()
 
     def drop(self,x,y,game):
         if self.inventory[y][x].item_data.item_name != None:
-            game.drops.append(item(game, (self.owner.rect.rect.x + 30, self.owner.rect.rect.y + 30),self.owner.rect.dimension, self.inventory[y][x].count,self.inventory[y][x].item_data))
+            default.create_object(game.drops,item(game, (self.owner.rect.rect.x + 30, self.owner.rect.rect.y + 30),self.owner.rect.dimension, self.inventory[y][x].count,self.inventory[y][x].item_data))
             self.remove_at(x,y)
             self.apply_modifiers()
 
@@ -188,13 +191,19 @@ class item(pygame.sprite.Sprite):
         self.item_data = item_data(None)
         self.cooldown = 0
         self.item_data.copy(itemdata)
-        self.rect = self.image.get_rect((pos[0],pos[1]),dimension)
+        self.rect = self.image.get_rect(dimension,topleft=pos)
+
+    def to_dict_client(self):
+        return {
+            "rect":self.rect.copy(),
+            "image_data":self.image.to_dict(),
+        }
 
     def remove(self):
         self.rect = None
 
     def updator(self, game):
-        for player in game.players:
+        for player in list(game.players.values()):
             if self.rect.colliderect(player.rect):
                 if player.inventory.add_item(self.item_data,self.count):
                     self.remove()
@@ -207,7 +216,7 @@ class item(pygame.sprite.Sprite):
                     return True
 
     def render(self,players):
-        for player in players:
+        for player in list(players.values()):
             if self.rect.colliderect(player.render):
                 return True
 
@@ -221,7 +230,6 @@ class item(pygame.sprite.Sprite):
         self.image = default.load_image(self.path)
         self.item_data = other.item_data
         self.rect = other.rect
-
 
 class item_data:
     def __init__(self, item_name, max=32, modifiers=[modifier("damage", 1), modifier("attack_cooldown", 0.5)], tool_type=None, color=None, event=None):
@@ -241,6 +249,9 @@ class item_data:
         self.item_name = other.item_name
         self.max = other.max
         self.color = other.color
+
+    def __eq__(self, other):
+        return self.tool_type == other.tool_type and self.event == other.event and self.modifiers == other.modifiers and self.item_name == other.item_name and self.max == other.max and self.color == other.color
 
 class lootable:
     def __init__(self, loot_data, count=1, chance=1.0):

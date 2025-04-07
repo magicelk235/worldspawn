@@ -42,4 +42,3 @@ def worldspawn():
         server.server(path).main()
     else:
         client.client(path).main()
-

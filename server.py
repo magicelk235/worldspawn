@@ -1,9 +1,8 @@
-import socket,pygame,gui,random,events,default,entities,objects,items,threading,pickle,os,world_generation,cv2
+import socket,pygame,gui,random,events,default,entities,objects,items,threading,pickle,os,world_generation,cv2,uuid
 
 class server:
     def __init__(self,path):
         self.port = 55555
-
         self.path = path
         self.banned_players = []
         self.game_running = True
@@ -11,105 +10,42 @@ class server:
         pygame.time.set_timer(pygame.USEREVENT, 1000)
         self.TIMER_EVENT = pygame.USEREVENT + 1
         pygame.time.set_timer(self.TIMER_EVENT, 100)
+        self.ATTACK_EVENT = pygame.USEREVENT + 2
+
         self.camera_group = gui.CameraGroup()
         pygame.display.set_mode((800, 400), pygame.SCALED | pygame.RESIZABLE)
-        self.game_started = False
         self.remove_player_list = []
         self.new_players = []
         pygame.display.set_caption(f"WorldSpawn Code:{default.encrypt(self.get_local_ip())}")
         pygame.display.set_icon(pygame.image.load(default.resource_path("assets/gui/world_icon.png")))
-        self.players = [entities.Player((0, 0),"world", self)]
-
-        self.owner = self.players[0]
-        self.update_data = []
+        self.players = {}
+        default.create_object(self.players,entities.Player((0, 0),"world", self))
+        self.owner = list(self.players.values())[0]
         # World_gen
         self.event_list = []
-        self.objects = []
-        self.caves = []
-        self.entities = []
-        self.drops = []
-        self.events = []
-        self.projectiles = []
-        self.particles = []
-        chunk_data = {"objects":[
-            {"name":"tree_cherry","percent":1/3,"min":1,"max":3},
-            {"name":"tree_oak","percent":1/3,"min":1,"max":3},
-            {"name":"tree_spruce","percent":1/3,"min":1,"max":3},
-            {"name":"bush","percent":1/2,"min":1,"max":3},
+        self.all_types = {}
+        self.objects = {}
+        self.entities = {}
+        self.drops = {}
+        self.events = {}
+        self.projectiles = {}
+        self.particles = {}
+        self.update_dict_data = {}
 
-            {"name":"twig","percent":1/4,"min":1,"max":2},
-            {"name":"rock","percent":1,"min":0,"max":2},
-
-            {"name":"sand_temple","percent":1/50,"min":1,"max":1},
-            {"name":"olympos","percent":1/50,"min":1,"max":1},
-            {"name":"defence_tower","percent":1/50,"min":1,"max":1},
-            {"name":"ruined_village","percent":1/50,"min":1,"max":1},
-            {"name":"knight_tower","percent":1/50,"min":1,"max":1},
-            {"name":"cursed_olympos","percent":1/50,"min":1,"max":1},
-            {"name":"ship","percent":1/50,"min":1,"max":1},
-
-            {"name": "flower_blue", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "flower_green", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "flower_red", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "flower_white", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "flower_black", "percent": 1 / 3, "min": 1, "max": 2},
-
-            {"name": "wheat", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "potato", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "carrot", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "tomato", "percent": 1 / 3, "min": 1, "max": 2},
-            {"name": "pumpkin", "percent": 1 / 3, "min": 1, "max": 2},
-
-            {"name": "lake", "percent": 1 / 7, "min": 0, "max": 2},
-            {"name": "cliff", "percent": 1 / 7, "min": 0, "max": 2},
-            {"name": "mini_cliff", "percent": 1 / 7, "min": 0, "max": 2},
-            {"name": "cave", "percent": 1 / 6, "min": 1, "max": 2},
-
-        ]
-
-,"entities":[
-            {"name":"cow","percent":1/8,"min":0,"max":2},
-            {"name":"lion","percent":1/8,"min":0,"max":2},
-            {"name":"chicken","percent":1/8,"min":0,"max":2},
-            {"name":"horse","percent":1/8,"min":0,"max":2},
-            {"name":"deer","percent":1/8,"min":0,"max":2},
-            {"name":"duck","percent":1/8,"min":0,"max":2},
-            {"name":"pig","percent":1/8,"min":0,"max":2},
-            {"name":"goat","percent":1/8,"min":0,"max":2},
-            {"name":"dog","percent":1/8,"min":0,"max":2},
-            {"name":"sheep","percent":1/8,"min":0,"max":2},
-            ],
-        "caves":[]}
-
-        chunk_data =world_generation.chunk_data("grass",chunk_data)
-        chunk_data1 = {"objects": [{"name": "cave_rock", "percent": 0.70, "min": 1, "max": 5},
-                                   {"name": "coal_ore", "percent": 0.35, "min": 1, "max": 2},
-                                   {"name": "copper_ore", "percent": 0.30, "min": 1, "max": 2},
-                                   {"name": "iron_ore", "percent": 0.25, "min": 1, "max": 2},
-                                   {"name": "silver_ore", "percent": 0.20, "min": 1, "max": 2},
-                                   {"name": "gold_ore", "percent": 0.15, "min": 1, "max": 2},
-
-                                   {"name": "cave_wall_x", "percent": 0.5, "min": 1, "max": 5},
-                                   {"name": "cave_wall_y", "percent": 0.5, "min": 1, "max": 5},
-                                   ],"entities": [],"caves":[]}
-        chunk_data1 = world_generation.chunk_data("cave_ground", chunk_data1)
-        self.dimensions = [world_generation.dimension("world",chunk_data),world_generation.dimension("cave",chunk_data1)]
-        self.events.append(events.event(self, events.event_data(1, 10 ** 60, "night", "night",["zombie", "skeleton", "troll", "ogre", "fungal","cyclops", "caveman", "witch", "stone_golem"],summon_delay=6,dimension="cave")))
-        self.events.append(events.event(self, events.event_data(5 * 60, 2.5 * 60, "night", "night",
-                                                                ["zombie", "skeleton", "troll", "ogre", "fungal",
-                                                                 "cyclops", "caveman", "witch", "stone_golem"])))
-        self.events.append(events.event(self, events.event_data(20 * 60, 2.5 * 60, "goblin_raid", "goblin_gas",
-                                                                ["goblin", "goblin_witch", "goblin_archer",
-                                                                 "goblin_spikeball", "goblin_wolf_rider"],
-                                                                summon_delay=4)))
-        self.events.append(events.event(self, events.event_data(10 * 60, 2.5 * 60, "rain", "rain",
-                                                                ["water_golem", "tornado", "water_golem_mini",
-                                                                 "tornado_mini"], summon_delay=6)))
-        self.objects.append(objects.object(self, (2954-3008, 2970-3003), "world", default.get_object("spawn0")))
+        self.dimensions = []
+        self.seed = random.randint(0,9999999)
+        self.dimensions.append(world_generation.dimension(default.get_dimension("world"),self.seed))
+        self.dimensions.append(world_generation.dimension(default.get_dimension("cave"),self.seed))
+        default.create_object(self.events,events.event(default.get_event("night")))
+        default.create_object(self.events,events.event(default.get_event("cave_night")))
+        default.create_object(self.events,events.event(default.get_event("rain")))
+        default.create_object(self.events,events.event(default.get_event("goblin_raid")))
+        default.create_object(self.objects,objects.object(self, (0, 0), "world", default.get_object("spawn0")))
         try:
             self.recover()
         except:
             pass
+
 
     def get_local_ip(self):
         try:
@@ -123,23 +59,113 @@ class server:
 
     def close(self):
         events_list = []
-        for event in self.events:
+        for event in list(self.events.values()):
             events_list.append(event.to_dict())
         with open(f"{self.path}/events.pkl","wb") as file:
             pickle.dump(events_list,file)
 
         if not os.path.exists(f"{self.path}/players"):
             os.mkdir(f"{self.path}/players")
-        for player in self.players:
+        for player in list(self.players.values()):
             player_data = player.to_dict()
             with open(f"{self.path}/players/{player.id}.pkl", "wb") as file:
                 pickle.dump(player_data, file)
 
-        server_data = [self.banned_players,self.owner.id]
+        server_data = [self.banned_players,self.owner.id,self.seed]
         with open(f"{self.path}/server_data.pkl", "wb") as file:
             pickle.dump(server_data, file)
         for dimension in self.dimensions:
             dimension.save(self)
+
+    def post_event(self,event,**kwargs):
+        self.event_list.append(pygame.event.Event(event, kwargs))
+
+    def createObject(self,object,objectDict):
+        while True:
+            id = uuid.uuid4()
+            if self.all_types.get(id) == None:
+                break
+        self.all_types[id] = object
+        objectDict[id] = object
+
+    def loadObject(self,object,id,objectDict):
+        self.all_types[id] = object
+        objectDict[id] = object
+
+
+    def send_update(self,conn,addr,player):
+        dict_data = self.update_dict_data.get(player.id,None)
+        if dict_data == None:
+            dict_data = {"objects":{},"entities":{},"players":{},"drops":{},"projectiles":{},"particles":{}}
+        objects = {}
+        entities = {}
+        players = {}
+        drops = {}
+        projectiles = {}
+        particles = {}
+        default.delta_key_dict(dict_data["objects"],self.objects)
+        default.delta_key_dict(dict_data["entities"],self.entities)
+        default.delta_key_dict(dict_data["players"],self.players)
+        default.delta_key_dict(dict_data["drops"],self.drops)
+        default.delta_key_dict(dict_data["particles"],self.particles)
+        default.delta_key_dict(dict_data["projectiles"],self.projectiles)
+        for key in list(self.objects.keys()):
+            if dict_data["objects"].get(key,None) != None:
+                objects[key] = default.delta_dict(dict_data["objects"][key],self.objects[key].to_dict_client())
+                for key_name in list(objects[key]):
+                    dict_data["objects"][key][key_name] = objects[key][key_name]
+
+            else:
+                objects[key] = self.objects[key].to_dict_client()
+                dict_data["objects"][key] = objects[key]
+
+        for key in list(self.entities.keys()):
+            if dict_data["entities"].get(key,None) != None:
+                entities[key] = default.delta_dict(dict_data["entities"][key],self.entities[key].to_dict_client()) if key != player.ride_target_id else default.delta_dict(dict_data["entities"][key],self.entities[key].to_dict_client()) | {"rect":self.entities[key].rect.copy()}
+                for key_name in list(entities[key]):
+                    dict_data["entities"][key][key_name] = entities[key][key_name]
+            else:
+                entities[key] = self.entities[key].to_dict_client()
+                dict_data["entities"][key] = entities[key]
+
+        for key in list(self.players.keys()):
+            if dict_data["players"].get(key,None) != None:
+                players[key] = default.delta_dict(dict_data["players"][key],self.players[key].to_dict_client()) if key != player.id else self.players[key].to_dict_main_client()
+                for key_name in list(players[key]):
+                    dict_data["players"][key][key_name] = players[key][key_name]
+            else:
+                players[key] = self.players[key].to_dict_client() if key != player.id else self.players[key].to_dict_main_client()
+                dict_data["players"][key] = players[key]
+
+        for key in list(self.drops.keys()):
+            if dict_data["drops"].get(key,None) != None:
+                drops[key] = default.delta_dict(dict_data["drops"][key],self.drops[key].to_dict_client())
+                for key_name in list(drops[key]):
+                    dict_data["drops"][key][key_name] = drops[key][key_name]
+            else:
+                drops[key] = self.drops[key].to_dict_client()
+                dict_data["drops"][key] = drops[key]
+
+        for key in list(self.projectiles.keys()):
+            if dict_data["projectiles"].get(key,None) != None:
+                projectiles[key] = default.delta_dict(dict_data["projectiles"][key],self.projectiles[key].to_dict_client())
+                for key_name in list(projectiles[key]):
+                    dict_data["projectiles"][key][key_name] = projectiles[key][key_name]
+            else:
+                projectiles[key] = self.projectiles[key].to_dict_client()
+                dict_data["projectiles"][key] = projectiles[key]
+
+        for key in list(self.particles.keys()):
+            if dict_data["particles"].get(key,None) != None:
+                particles[key] = default.delta_dict(dict_data["particles"][key],self.particles[key].to_dict_client())
+                for key_name in list(particles[key]):
+                    dict_data["particles"][key][key_name] = particles[key][key_name]
+            else:
+                particles[key] = self.particles[key].to_dict_client()
+                dict_data["particles"][key] = particles[key]
+
+        default.send_msg(conn,{"objects":objects,"entities":entities,"players":players,"drops":drops,"projectiles":projectiles,"particles":particles})
+        self.update_dict_data[player.id] = dict_data
 
     def handle_client(self,conn, addr):
         print(f"New connection: {addr}")
@@ -148,19 +174,22 @@ class server:
 
         player = None
         try:
-            while True:
+            while self.game_running:
                 if player == None:
-                    player = default.get_player(self.players,id)
+                    player = self.players.get(id,None)
+
                 else:
                     data = default.recv_msg(conn)
                     if not data:
                         raise Exception("no data received from client")
                     data = default.unserialize_pygame_inputs(data)
-                    player.keys.append(data[1])
-                    player.events.append(data[0])
+                    player.events += data[0]
+                    player.keys += data[1]
                     player.mouse = data[2]
-                    screen = self.camera_group.to_dict(player)
-                    default.send_surface(conn,screen)
+                    self.send_update(conn,addr,player)
+                    # screen = self.camera_group.to_dict(player)
+                    # default.send_surface(conn,screen)
+
         except Exception as e:
             print(e)
             print(f"Connection lost: {addr}")
@@ -168,11 +197,16 @@ class server:
             self.remove_player_list.append(player)
 
     def recover(self):
-
         with open(f"{self.path}/server_data.pkl","rb") as file:
             server_data = pickle.load(file)
             self.banned_players = server_data[0]
-            self.players[-1].from_dict(self.path,server_data[1])
+            with open(f"{path}/players/{server_data[1]}.pkl", "rb") as f:
+                player_dict = pickle.load(f)
+                default.load_object(self.players,entities.Player((0,0),"nu",self,player_dict=player_dict),server_data[1])
+            self.seed = server_data[2]
+            for dimension in self.dimensions:
+                dimension.seed = self.seed
+
 
         with open(f"{self.path}/events.pkl","rb") as file:
             new_events = pickle.load(file)
@@ -187,20 +221,21 @@ class server:
             self.event_list = self.owner.events
             self.owner.keys = pygame.key.get_pressed()
             self.owner.keys = default.get_pressed_key_names(self.owner.keys)
+
             for id in self.new_players:
-                self.players.append(entities.Player((0, 0),"world", self))
+
                 if os.path.exists(f"{self.path}/players/{id}.pkl"):
-                    self.players[-1].from_dict(self.path, id)
-                self.players[-1].id = id
+                    with open(f"{self.path}/players/{id}.pkl", "rb") as f:
+                        player_dict = pickle.load(f)
+                        default.load_object(self.players,entities.Player((0,0),"wds",self,player_dict=player_dict),id)
+                else:
+                    default.load_object(self.players, entities.Player((0, 0), "world", self),id)
                 self.new_players.remove(id)
             for event in self.owner.events:
                 if event.type == pygame.QUIT:
                     self.game_running = False
             self.game_update()
-            try:
-                self.camera_group.server_draw(self.owner, True)
-            except:
-                pass
+            self.camera_group.server_draw(self.owner)
             pygame.display.flip()
             for player in self.remove_player_list:
                 player.gui_open = False
@@ -209,22 +244,20 @@ class server:
                     os.mkdir(f"{self.path}/players")
                 with open(f"{self.path}/players/{player.id}.pkl", "wb") as f:
                     pickle.dump(player.to_dict(),f)
-                player.to_dict()
+                del self.update_dict_data[player.id]
                 self.camera_group.remove(player)
                 player.close()
-                self.players.remove(player)
-                del player
+                del self.players[player.id]
+
         self.close()
         pygame.quit()
 
     def start_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
         server.bind(("0.0.0.0", self.port))
         server.settimeout(5)# Bind to all network interfaces
         server.listen(5)
         print(f"use {default.encrypt(self.get_local_ip())} to join")
-
         print("Server started!")
         print("Waiting for connections...")
         while self.game_running:
@@ -239,49 +272,45 @@ class server:
     def game_update(self):
         for dimension in self.dimensions:
             dimension.updator(self)
-        for Block in self.objects:
-            if Block.render(self.players):
-                if Block.updator(self):
-                    self.objects.remove(Block)
-                    self.camera_group.remove(Block)
-                    Block.rect = None
-                    del Block
-        for Entity in self.entities:
-            if Entity.render(self.players):
-                if Entity.updator(self):
-                    self.entities.remove(Entity)
-                    self.camera_group.remove(Entity)
-                    Entity.rect = None
-                    del Entity
-        for cave in self.caves:
-            if cave.render(self.players):
-                cave.updator(self)
+        for key in list(self.objects.keys()):
+            if self.objects[key].render(self.players):
+                if self.objects[key].updator(self):
+                    self.camera_group.remove(self.objects[key])
+                    self.objects[key].rect = None
+                    del self.objects[key]
+        for key in list(self.entities.keys()):
+            if self.entities[key].render(self.players):
+                if self.entities[key].updator(self):
 
-        for particle in self.particles:
-            if particle.render(self.players):
-                if particle.updator(self):
-                    self.particles.remove(particle)
-                    self.camera_group.remove(particle)
-                    del particle
+                    self.camera_group.remove(self.entities[key])
 
-        for drop in self.drops:
-            if drop.render(self.players):
-                if drop.updator(self):
-                    self.drops.remove(drop)
-                    self.camera_group.remove(drop)
-                    del drop
-        for Projectile in self.projectiles:
-            if Projectile.render(self.players):
-                if Projectile.updator(self):
-                    self.projectiles.remove(Projectile)
-                    self.camera_group.remove(Projectile)
-                    del Projectile
-        for event in self.events:
-            event.updator(self)
+                    self.entities[key].rect = None
+                    del self.entities[key]
 
+        for key in list(self.particles.keys()):
+            if self.particles[key].render(self.players):
+                if self.particles[key].updator(self):
 
-        for player in self.players:
-            player.updator(self)
-            player.keys = []
-            player.events = []
-            
+                    self.camera_group.remove(self.particles[key])
+                    del self.particles[key]
+
+        for key in list(self.drops.keys()):
+            if self.drops[key].render(self.players):
+                if self.drops[key].updator(self):
+
+                    self.camera_group.remove(self.drops[key])
+                    del self.drops[key]
+
+        for key in list(self.projectiles.keys()):
+            if self.projectiles[key].render(self.players):
+                if self.projectiles[key].updator(self):
+
+                    self.camera_group.remove(self.projectiles[key])
+                    del self.projectiles[key]
+        for key in list(self.events.keys()):
+            self.events[key].updator(self)
+
+        for key in list(self.players.keys()):
+            self.players[key].updator(self)
+            self.players[key].keys = []
+            self.players[key].events = []

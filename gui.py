@@ -1,11 +1,22 @@
 import pickle
 
 import default,objects,items,math,pygame,os,copy,gif_pygame,shutil
+import particles
 
-class display_sprite:
-    def __init__(self,pos,image):
-        self.pos = pos
-        self.image = image
+
+class display_sprite(pygame.sprite.Sprite):
+    def __init__(self,default_dict,group):
+        super().__init__(group)
+        self.rect = default_dict["rect"]
+        self.image = default.image("assets/gui/None")
+        self.image.from_dict(default_dict["image_data"])
+
+    def to_dict(self):
+        return {
+            "rect":self.rect.copy(),
+            "image_data":self.image.to_dict()
+        }
+
 
 class selected(pygame.sprite.Sprite):
     def __init__(self,pos,dimension,x,y,game,player):
@@ -15,7 +26,7 @@ class selected(pygame.sprite.Sprite):
         self.player = player
         self.path = "assets/gui/selected"
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect(pos,dimension)
+        self.rect = self.image.get_rect(dimension,topleft=pos)
 
     def delete(self):
         self.image = None
@@ -39,7 +50,7 @@ class inventory_selector(pygame.sprite.Sprite):
         self.selected = None
         self.path = "assets/gui/None"
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect((self.inventory_pos[0] + self.x * 36,self.inventory_pos[1] + self.y * 36),dimension)
+        self.rect = self.image.get_rect(dimension,topleft=(self.inventory_pos[0] + self.x * 36,self.inventory_pos[1] + self.y * 36))
 
     def moving(self,game):
         self.path = "assets/gui/selector"
@@ -52,7 +63,7 @@ class inventory_selector(pygame.sprite.Sprite):
                     if self.is_ready == None:
                         self.selected = selected((self.rect.rect.x, self.rect.rect.y),self.rect.dimension,self.x, self.y, game,self.player)
                         self.is_ready = False
-                    elif not self.is_ready:
+                    elif not self.is_ready and self.selected.x != self.x or self.selected.y != self.y:
                         self.is_ready = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w:
@@ -73,8 +84,7 @@ class inventory_selector(pygame.sprite.Sprite):
 
 
     def delete(self):
-        self.image = None
-        self.rect = None
+        self.rect.dimension = "null"
         if self.selected != None:
             self.selected.delete()
 
@@ -91,7 +101,7 @@ class hotbar_selector(pygame.sprite.Sprite):
         self.inventory_pos = pos
         self.path = "assets/gui/selector"
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect((self.inventory_pos[0] + self.x * 36,self.inventory_pos[1] + self.y * 36),dimension)
+        self.rect = self.image.get_rect(dimension,topleft=(self.inventory_pos[0] + self.x * 36,self.inventory_pos[1] + self.y * 36))
 
     def moving(self, hotbar):
         self.rect.rect.topleft =(hotbar.rect.rect.x + self.x * 36, hotbar.rect.rect.y + self.y * 36)
@@ -126,28 +136,26 @@ class block_selector(pygame.sprite.Sprite):
         self.inventory_pos = pos
         self.path = "assets/gui/block_selector"
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect((self.x * 32+5,self.y * 23+5),dimension)
+        self.rect = self.image.get_rect(dimension,topleft=(self.x * 32+5,self.y * 23+5))
 
     def moving(self):
         if self.image != None:
             self.path = "assets/gui/block_selector"
             self.image.replace_path(self.path)
-            self.rect = self.image.get_rect((1, 1),self.rect.dimension)
-
-
+            self.rect = self.image.get_rect(self.rect.dimension,topleft=(1, 1))
 
         mouse_pos = self.player.mouse
         x = mouse_pos[0] + self.player.rect.rect.centerx - 400
         y = mouse_pos[1] + self.player.rect.rect.centery - 200
 
-        if x > self.player.rect.rect.x + 26*self.player.range:
-            x = self.player.rect.rect.x + 26*self.player.range
-        elif x < self.player.rect.rect.x - 26*self.player.range:
-            x = self.player.rect.rect.x - 26*self.player.range
-        if y > self.player.rect.rect.y + 20*self.player.range:
-            y = self.player.rect.rect.y + 20*self.player.range
-        elif y < self.player.rect.rect.y - 20*self.player.range:
-            y = self.player.rect.rect.y - 20*self.player.range
+        if x > self.player.rect.rect.centerx + 26*self.player.range:
+            x = self.player.rect.rect.centerx + 26*self.player.range
+        elif x < self.player.rect.rect.centerx - 26*self.player.range:
+            x = self.player.rect.rect.centerx - 26*self.player.range
+        if y > self.player.rect.rect.centery + 20*self.player.range:
+            y = self.player.rect.rect.centery + 20*self.player.range
+        elif y < self.player.rect.rect.centery - 20*self.player.range:
+            y = self.player.rect.rect.centery - 20*self.player.range
 
 
 
@@ -175,7 +183,7 @@ class gui_item(pygame.sprite.Sprite):
             self.count = ""
         self.path = f'assets/items/{name}'
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect(pos,dimension)
+        self.rect = self.image.get_rect(dimension,topleft=pos)
         self.text = text((self.rect.rect.x+14,self.rect.rect.y+14),dimension,24,str(count),game.camera_group,player=player)
 
 
@@ -212,7 +220,7 @@ class crafting_gui(pygame.sprite.Sprite):
         self.player = player
         self.path = "assets/gui/None"
         self.image = default.image(self.path)
-        self.rect = self.image.get_rect((-1000,-1000),player.rect.dimension)
+        self.rect = self.image.get_rect(player.rect.dimension,topleft=(-1000,-1000))
         self.needed_items = None
         self.needed_items_gui = inventory(game,-240,10,1,1,True,player)
         self.is_open = False
@@ -221,6 +229,8 @@ class crafting_gui(pygame.sprite.Sprite):
         self.is_created = False
 
     def updator(self,recipes,game):
+        if not self.player.inventory_display.opened:
+            self.player.inventory_display.open_inventory(game,self.player,self.player.inventory.inventory,)
         if not self.is_created:
             self.item.reset(recipes[self.x].result.item_data.item_name,recipes[self.x].result.count,(self.rect.rect.x+6,self.rect.rect.y+24),self.player.rect.dimension)
             if self.needed_items_gui != None:
@@ -241,14 +251,16 @@ class crafting_gui(pygame.sprite.Sprite):
         else:
             self.needed_items_gui.updator(game,self.needed_items)
         for event in self.player.events:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w and self.x < len(recipes) - 1:
+            if event.type == pygame.MOUSEWHEEL:
+                if event.y > 0 and self.x < len(recipes) - 1:
                     self.x += 1
                     self.is_created = False
-                elif event.key == pygame.K_s and self.x != 0:
+                elif event.y < 0 and self.x != 0:
                     self.x -= 1
                     self.is_created = False
-                elif event.key == pygame.K_RETURN:
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_RETURN:
                     has_items = True
                     for item in recipes[self.x].items:
                         if not self.player.inventory.has_item(item.item_data.item_name,item.count):
@@ -259,15 +271,14 @@ class crafting_gui(pygame.sprite.Sprite):
 
 
     def close(self):
-        self.player.gui_open = False
-        self.player.inventory_display.close_inventory()
         self.is_created = False
+        self.is_open = False
         self.path = "assets/gui/None"
         self.image.replace_path(self.path)
         self.needed_items_gui.close_inventory()
         self.item.remove()
         self.item.reset(None,0,(999999,999999),self.player.rect.dimension)
-        self.is_open = False
+        self.player.inventory_display.close_inventory()
 
 
     def remove(self):
@@ -284,9 +295,8 @@ class crafting_gui(pygame.sprite.Sprite):
         self.x = 0
         self.path = "assets/gui/crafting_gui"
         self.image.replace_path(self.path)
-        self.rect = self.image.get_rect((self.player.rect.rect.x-150-((self.image.image.width)//2), self.player.rect.rect.y + 50-((self.image.image.height)//2)),self.player.rect.dimension)
+        self.rect = self.image.get_rect(self.player.rect.dimension,topleft=(self.player.rect.rect.x-150-((self.image.image.width)//2), self.player.rect.rect.y + 50-((self.image.image.height)//2)))
         self.is_open = True
-        self.player.gui_open = True
 
 class CameraGroup(pygame.sprite.Group):
     def __init__(self):
@@ -321,14 +331,21 @@ class CameraGroup(pygame.sprite.Group):
         sprite_list = []
 
         load_floor = [
-            "grass",
-            "cave_ground",
+            "plains_chunk",
+            "desert_chunk",
+            "cave_chunk",
+            "mountains_chunk",
+            "swamp_chunk",
         ]
 
         load_object_start = [
             "wooden_floor",
             "rock_floor",
+            "cave",
             "lake",
+            "ice_lake",
+            "swamp_bump",
+            "swamp_lake",
             "cliff",
             "mini_cliff",
             "spawn0",
@@ -371,12 +388,14 @@ class CameraGroup(pygame.sprite.Group):
             "<block_selector Sprite(in 1 groups)>",
             "<world_menu_selector Sprite(in 1 groups)>",
         ]
-        load_theme = [
-            "<theme Sprite(in 1 groups)>"
+        load_particle_theme = [
+            "night_theme",
+            "rain_theme",
+            "goblin_raid_theme",
         ]
-
-        # ground
+        themes = []
         player_offset = pygame.math.Vector2()
+
         player_offset.x = player.rect.rect.centerx - self.half_w
         player_offset.y = player.rect.rect.centery - self.half_h
 
@@ -386,8 +405,12 @@ class CameraGroup(pygame.sprite.Group):
                     sprite.image.image._animate()
                 if ignore_render or player.render.colliderect(sprite.rect) :
                     if str(sprite) == "<object Sprite(in 1 groups)>" and sprite.name in load_floor:
-                        offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+                        offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                         sprite_list.append({"sprite":sprite,"location":offset})
+                if player.rect.dimension == sprite.rect.dimension:
+                    if isinstance(sprite,particles.particle):
+                        if sprite.data.name in load_particle_theme:
+                            themes.append(sprite)
             elif clear_trash:
                 self.remove(sprite)
                 del sprite
@@ -398,7 +421,8 @@ class CameraGroup(pygame.sprite.Group):
                     sprite.image.image._animate()
                 if ignore_render or player.render.colliderect(sprite.rect) :
                     if str(sprite) == "<object Sprite(in 1 groups)>" and sprite.name in load_object_start:
-                        offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+
+                        offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                         sprite_list.append({"sprite":sprite,"location":offset})
         load_object_start += load_floor
 
@@ -407,19 +431,18 @@ class CameraGroup(pygame.sprite.Group):
                 load_object_check = False
                 if str(sprite) == "<object Sprite(in 1 groups)>" and sprite.name in load_object_start:
                     load_object_check = True
-                if not (str(sprite) in load_end or str(sprite) in load_middle or str(
-                        sprite) in load_theme or load_object_check):
-                    offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+                if not (str(sprite) in load_end + load_middle or sprite in themes or load_object_check):
+                    offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                     sprite_list.append({"sprite": sprite, "location": offset})
         for sprite in self.sprites():
             if sprite.rect != None and (ignore_render or player.render.colliderect(sprite.rect)):
                 if str(sprite) in load_middle:
                     if str(sprite) in one_player_load and client:
                         if sprite.player == player:
-                            offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+                            offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                             sprite_list.append({"sprite": sprite, "location": offset})
                     elif not client:
-                        offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+                        offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                         sprite_list.append({"sprite": sprite, "location": offset})
 
         for sprite in self.sprites():
@@ -427,16 +450,17 @@ class CameraGroup(pygame.sprite.Group):
                 if str(sprite) in load_end:
                     if str(sprite) in one_player_load and client:
                         if sprite.player == player:
-                            offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+
+                            offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                             sprite_list.append({"sprite": sprite, "location": offset})
                     elif not client:
-                        offset = sprite.rect.rect.topleft - player_offset + self.internal_offset
+
+                        offset = default.subtraction_tuple(default.subtraction_tuple(sprite.rect.rect.topleft,sprite.image.get_additional_size(sprite.rect.display_type)),default.subtraction_tuple(sprite.rect.rect.topleft,sprite.rect.get_by_display())) - player_offset + self.internal_offset
                         sprite_list.append({"sprite": sprite, "location": offset})
 
 
-        for sprite in self.sprites():
-            if str(sprite) in load_theme and sprite.rect.dimension == player.rect.dimension:
-                sprite_list.append({"sprite": sprite, "location": self.internal_offset})
+        for sprite in themes:
+            sprite_list.append({"sprite": sprite, "location": self.internal_offset})
         return sprite_list
 
     def to_dict(self,player):
@@ -456,20 +480,14 @@ class CameraGroup(pygame.sprite.Group):
 
         return internal_surf
 
-    def normal_draw(self):
-        pass
-    def client_draw(self,display_surface):
-
-        self.display_surface.blit(display_surface, (0,0))
-        pygame.display.flip()
 
     def server_draw(self, player, client=True, ignore_render=False):
         self.internal_surf.fill('#191716')
 
-        self.center_target_camera(player)
 
 
         for sprite in self.player_load(player,client,ignore_render,always_update=True):
+
             sprite["sprite"].image.display_image(self.internal_surf, sprite["location"])
         internal_surf = pygame.transform.scale(self.internal_surf, self.internal_surface_size_vector * self.zoom_scale)
         scaled_rect = internal_surf.get_rect(center=(self.half_w, self.half_h))
@@ -480,7 +498,7 @@ class world_menu_selector(pygame.sprite.Sprite):
     def __init__(self,pos,dimension,camera_group):
         super().__init__(camera_group)
         self.image = default.image('assets/gui/world_selector')
-        self.rect = self.image.get_rect(pos,dimension)
+        self.rect = self.image.get_rect(dimension,topleft=pos)
         self.offset = 0
         self.keyboard = None
         self.y = 0
@@ -542,7 +560,7 @@ class world_menu(pygame.sprite.Sprite):
             os.mkdir("data/join")
 
         self.image = default.image("assets/gui/world_list")
-        self.rect = self.image.get_rect(pos,"world")
+        self.rect = self.image.get_rect("world",topleft=pos)
 
         self.path = f"data/{extension}"
         self.worlds_list = os.listdir(self.path)
@@ -567,7 +585,7 @@ class world_icon(pygame.sprite.Sprite):
     def __init__(self, pos, camera_group):
         super().__init__(camera_group)
         self.image = default.image("assets/gui/world_icon")
-        self.rect = self.image.get_rect(pos,"world")
+        self.rect = self.image.get_rect("world",topleft=pos)
 
     def delete(self):
         self.rect = None
@@ -577,7 +595,7 @@ class textbox(pygame.sprite.Sprite):
     def __init__(self,pos,camera_group):
         super().__init__(camera_group)
         self.image = default.image("assets/gui/textbox")
-        self.rect = self.image.get_rect(pos,"world")
+        self.rect = self.image.get_rect("world",topleft=pos)
 
 class keyboard:
     def __init__(self,camera_group,pos,default_text="",max=30):
@@ -621,7 +639,7 @@ class game_type_gui(pygame.sprite.Sprite):
     def __init__(self,pos,camera_group):
         super().__init__(camera_group)
         self.image = default.image("assets/gui/game_type")
-        self.rect = self.image.get_rect(pos,"world")
+        self.rect = self.image.get_rect("world",topleft=pos)
         self.host_button = button(self.rect.rect.x+15,self.rect.rect.y+13,130,40)
         self.join_button = button(self.rect.rect.x+15,self.rect.rect.y+59,130,40)
 
@@ -648,7 +666,7 @@ class text(pygame.sprite.Sprite):
 
         self.image = default.image("assets/gui/None")
         self.image.image = font.render(str(self.text), normal_font, self.color)
-        self.rect = self.image.get_rect(pos,dimension)
+        self.rect = self.image.get_rect(dimension,topleft=pos)
 
     def updator(self):
         if self.normal_font:
@@ -747,9 +765,9 @@ class inventory(pygame.sprite.Sprite):
         self.display_only = display_only
         self.max_x = max_x
         self.max_y = max_y
-        self.rect = self.image.get_rect((0, 0),self.player.rect.dimension)
+        self.rect = self.image.get_rect(self.player.rect.dimension,topleft=(0, 0))
         self.opened = False
-        self.selector = None
+        self.selector = inventory_selector((self.rect.rect.x, self.rect.rect.y),"null", game, self.max_x, self.max_y,player)
         self.display_array = [[gui_item((-3000,-3000),self.player.rect.dimension,0,None,game,player) for _ in range(max_x)] for _ in range(max_y)]
 
 
@@ -763,7 +781,7 @@ class inventory(pygame.sprite.Sprite):
             self.display_array = [[gui_item((99999,99999),self.player.rect.dimension,0,None,game,self.player) for _ in range(self.max_x)] for _ in range(self.max_y)]
         self.image.replace_path(self.path)
         self.image.cut_image(36*self.max_x+4,36*self.max_y+4)
-        self.rect = self.image.get_rect((player.rect.rect.x + self.offset_x - ((36 * self.max_x) // 2),player.rect.rect.y + self.offset_y - ((36 * self.max_y) // 2)),self.player.rect.dimension)
+        self.rect = self.image.get_rect(self.player.rect.dimension,topleft=(player.rect.rect.x + self.offset_x - ((36 * self.max_x) // 2),player.rect.rect.y + self.offset_y - ((36 * self.max_y) // 2)))
 
         self.reset(inventory)
         if not self.display_only:
@@ -796,11 +814,9 @@ class inventory(pygame.sprite.Sprite):
     def close_inventory(self):
         self.path = 'assets/gui/None'
         self.image.replace_path(self.path)
-        self.rect = self.image.get_rect((99999,99999),"world")
+        self.rect = self.image.get_rect("world",topleft=(0,0))
         if self.selector != None:
             self.selector.delete()
-            if self.selector.selected != None:
-                self.selector.selected.delete()
         for x in range(self.max_x):
             for y in range(self.max_y):
                 self.display_array[y][x].reset(None,0,(99999,999999),self.player.rect.dimension)
@@ -826,7 +842,7 @@ class hotbar(pygame.sprite.Sprite):
         self.path = 'assets/gui/hotbar'
         self.image = default.image(self.path)
         self.player = player
-        self.rect = self.image.get_rect((player.rect.rect.x - 90, player.rect.rect.y + 170),self.player.rect.dimension)
+        self.rect = self.image.get_rect(self.player.rect.dimension,topleft=(player.rect.rect.x - 90, player.rect.rect.y + 170))
         self.selector = hotbar_selector((self.rect.rect.x, self.rect.rect.y),self.player.rect.dimension, game, 0, player)
         self.display_array = [gui_item((999999,999999),self.player.rect.dimension,0,None,game,self.player) for _ in range(5)]
 

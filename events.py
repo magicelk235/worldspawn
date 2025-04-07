@@ -1,5 +1,8 @@
 import gif_pygame, pygame, random,items,gui,default,math,entities,objects
 
+import particles
+
+
 class event_data:
     def __init__(self,time,durability,name,theme_name=None,entities_list=None,objects_list=None,summon_delay=15,dimension="world"):
         self.time = time
@@ -11,31 +14,14 @@ class event_data:
         self.objects_list = objects_list
         self.summon_delay = summon_delay
 
-class theme(pygame.sprite.Sprite):
-    def __init__(self,group,name,dimension):
-        super().__init__(group)
-        self.name = name
-        self.path = f"assets/themes/{name}"
-        self.image = default.image(self.path)
-        self.rect = self.image.get_rect((0,0),dimension)
-
-
-    def display(self):
-        self.path = f"assets/themes/{self.name}"
-        self.image.replace_path(self.path)
-
-    def undisplay(self):
-        self.path = f"assets/themes/None"
-        self.image.replace_path(self.path)
-
 class event:
-    def __init__(self,game,data):
+    def __init__(self,data):
         self.data = data
+        self.id = None
         self.time_c = 0
         self.durability_c = 0
         self.summon_delay_c = 0
-        self.theme = theme(game.camera_group,data.theme_name,data.dimension)
-        self.theme.undisplay()
+        self.particle_id= None
         self.currently = False
 
     def to_dict(self):
@@ -45,6 +31,8 @@ class event:
             "durability_c":self.durability_c,
             "summon_delay_c":self.summon_delay_c,
             "currently":self.currently,
+            "particle_id":self.particle_id,
+            "id":self.id,
         }
 
     def from_dict(self,event_dict):
@@ -53,6 +41,8 @@ class event:
         self.durability_c = event_dict["durability_c"]
         self.summon_delay_c = event_dict["summon_delay_c"]
         self.currently = event_dict["currently"]
+        self.particle_id = event_dict["particle_id"]
+        self.id = event_dict["id"]
 
     def updator(self,game):
         for Event in game.event_list:
@@ -63,29 +53,30 @@ class event:
                 else:
                     self.time_c += 1
         if self.time_c >= self.data.time:
-            self.start()
+            self.start(game)
         if self.durability_c >= self.data.durability:
-            self.end()
+            self.end(game)
         if self.summon_delay_c >= self.data.summon_delay:
-            for player in game.players:
+            for player in list(game.players.values()):
                 if player.rect.dimension == self.data.dimension:
                     if self.data.objects_list != None:
                         random_x = random.randint(player.render.rect.left,player.render.rect.right)
                         random_y = random.randint(player.render.rect.up,player.render.rect.down)
-                        game.objects.append(objects.object(game, (random_x, random_y),seld.data.dimension, default.get_object(random.choice(self.data.objects_list))))
+                        default.create_object(game.objects,objects.object(game, (random_x, random_y),seld.data.dimension, default.get_object(random.choice(self.data.objects_list))))
                     if self.data.entities_list != None:
                         random_x = random.randint(player.render.rect.left, player.render.rect.right)
                         random_y = random.randint(player.render.rect.top, player.render.rect.bottom)
-                        game.entities.append(entities.entity(game, default.get_entity(random.choice(self.data.entities_list)), (random_x, random_y),self.data.dimension))
+                        default.create_object(game.entities,entities.entity(game, default.get_entity(random.choice(self.data.entities_list)), (random_x, random_y),self.data.dimension))
                     self.summon_delay_c = 0
 
-    def start(self):
-        self.theme.display()
+    def start(self,game):
+        self.particle_id = default.create_object(game.particles,particles.particle(default.get_particle(self.data.theme_name),(0,0),self.data.dimension,game))
         self.currently = True
         self.time_c = 0
 
-    def end(self):
-        self.theme.undisplay()
+    def end(self,game):
+        if not self.durability_c >= self.data.durability:
+            game.particles[self.particle_id].cooldown = 0
         self.durability_c = 0
         self.summon_delay_c = 0
         self.currently = False
