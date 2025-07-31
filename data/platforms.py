@@ -1,26 +1,12 @@
-import pygame,default
+import pygame,default,default.multiMedia,default.events,default.idManager
 
-class Platform:
+class Platform(default.events.EventManager):
 	def __init__(self):
-		self.cameraGroup = gui.CameraGroup()
-		self.systemEventDict = {}
-		self.allTypes = {}
-		self.objects = {}
-		self.entities = {}
-		self.drops = {}
-		self.projectiles = {}
-		self.particles = {}
-		self.events = {}
-		self.players = {}
-		self.guis = {}
-		self.usedIDs = set()
-		self.typeDict = {}
+		default.events.EventManager.__init__(self)
+		
+		
+		self.typeManager = {}
 
-	def objectExist(objectID):
-		return self.allTypes.get(objectID,0) != 0
-
-	def getObjectByID(self,id):
-		return self.allTypes.get(id)
 
 	def loadTypes(self):
 		from runnableTypes import getRunnableTypes
@@ -68,24 +54,6 @@ class Platform:
 		for objectType in list(self.typeDict.keys()):
 			if issubclass(type,objectType):
 				return self.typeDict[objectType]
-
-	@staticmethod
-	def CreateObjectForExternalDict(objectDict,object):
-		objectDict[Platform.generateID(objectDict)] = object
-
-	def removeObjectByID(self,id):
-		self.removeObject(self.allTypes[id])
-
-	def removeObject(self,object):
-		del self.getDictByType(object)[object.id]
-		del self.allTypes[object.id]
-
-				
-	def createObject(self,object,forceType=None):
-		self.loadObject(object,self.generateID(self.usedIDs),forceType)
-
-	def loadObject(self,object,id,forceType=None):
-		self.appendToDictByType(object,id,forceType)
 
 class OnlinePlatform(Platform):
 	def __init__(self,ip,port,path):

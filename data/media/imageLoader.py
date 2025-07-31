@@ -1,4 +1,4 @@
-import os,pygame,gif_pygame,loader
+import os,pygame,loader
 from PIL import Image
 
 def loadImage(path):

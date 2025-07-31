@@ -17,13 +17,16 @@ class ImageData:
 	def toHash(self):
 		return "".join(self.__dict__.values())
 
+	def getValue(self,sprite,value):
+		if str(default.getAttr(value))[0] == "@":
+			return default.getAttr(sprite,default.getAttr(self,value)[1:])
+		else:
+			return default.getAttr(self,value)
 	# loaded
 	def setData(self,name,image,sprite):
 		if default.getAttr(self,name) != None:
-			if str(default.getAttr(name))[0] == "@":
-				default.setAttr(image,name,default.getAttr(sprite,default.getAttr(self,name)[1:]))
-			else:
-				default.setAttr(image,name,default.getAttr(self,name))
+			if self.getValue(name) != default.getAttr(image,name):
+				default.setAttr(image,name,self.getValue(name))
 		
 	def load(self,image,sprite):
 		keys = ["path","scaleSize","cutSize","flipX","flipY","color","angle","factoredSize"]
@@ -84,6 +87,7 @@ class Image:
 
 
 	def getRawImage(self):
+		self.imageData.load(self,self.sprite)
 		try:
 			return self._cache[self.imageData.toHash()]
 		except:

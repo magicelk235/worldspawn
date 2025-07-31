@@ -10,7 +10,7 @@ class Timer():
 		self.countDowns = {}
 	
 	def updateTimers(self):
-		if game.eventHappend(self.timerEvent):
+		if self.game.eventHappend(self.timerEvent):
 			for key in list(self.countDowns.keys()):
 				if self.countDowns[key] != 0:
 					self.countDowns[key] -= 0.1
@@ -26,4 +26,9 @@ class Timer():
 				self.countDowns.pop(name)
 			return True
 		return False
-		
+	
+	def __init_subclass__(cls):
+		super().__init_subclass__()
+		for name, obj in cls.__bases__[0].__dict__.items():
+			if isinstance(obj, type):
+				setattr(cls, name, obj)

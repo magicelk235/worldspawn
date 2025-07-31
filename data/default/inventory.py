@@ -9,7 +9,7 @@ class inventoryItem:
 
 	# checks
 	def needsToBeEmpty(self):
-		return isEmpty(self) and self.getName != None
+		return self.isEmpty(self) and self.getName != None
 
 	def sameName(self,name):
 		return self.getName() == name
@@ -91,22 +91,20 @@ class inventoryItem:
 
 	# modifiers
 
-	def applyModifiers(self,object,rightClicked=False,hand=False):
-		self.getItem().applyModifiers(object,rightClicked,hand)
+	def applyModifiers(self,object,hand=False):
+		self.getItem().applyModifiers(object,hand)
 
 	def __eq__(self, other):
-		if isinstance(other,inventory_item):
+		if isinstance(other,inventoryItem):
 			if other.count == self.count and other.item == self.item:
 				return True
 		return False
 
 class Inventory:
-	def __init__(self,w,h,owner,hasModifiers,graveTexture="grave"):
+	def __init__(self,w,h,owner):
 		self.inventory:list[inventoryItem] = [[None for i in range(w)]for j in range(h)]
 		self.size = (w,h)
-		self.graveTexture = graveTexture
 		self.owner = owner
-		self.hasModifiers = hasModifiers
 		self.clearInventory()
 		self.handPos = (4,4)
 
@@ -156,7 +154,7 @@ class Inventory:
 					return [w, h]
 		return None
 
-	def canAddItemAt(w,h,item):
+	def canAddItemAt(self,w,h,item):
 		if self.getItem(w,h).getItemName() != item.getItemName():
 			return False
 		return self.getItem(w,h).canAddCount(item.GetCount())
@@ -223,16 +221,16 @@ class Inventory:
 
 
 	# modifiers
-	def applyModifiers(self, rightClicked=False):
+	def applyModifiers(self):
 		self.update()
 		self.owner.resetModifiers()
-		self.getHandItem().applyModifiers(self.owner,rightClicked,True)
+		self.getHandItem().applyModifiers(self.owner,True)
 		usedNames = {}
 		for row in self.inventory:
 			for item in row:
 				if item.getName() not in usedNames:
 					usedNames.add(item.getName())
-					item.applyModifiers(self.owner,rightClicked)
+					item.applyModifiers(self.owner)
 
 
 	# interaction

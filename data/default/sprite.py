@@ -27,9 +27,10 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 
 	# custom classes
 	class Vector:
-		def __init__(self,angle,time):
+		def __init__(self,angle,time,speed=1):
 			self.angle = angle%360
 			self.time = time
+			self.speed = speed
 
 		def getOpposedAngle(self):
 			return self.angle+180
@@ -39,37 +40,48 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 			return self.time == 0
 
 		def update(self,sprite):
-			sprite.addX(round(sprite.speed*math.cos(math.radians(self.angle))))
-			sprite.addY(round(sprite.speed*math.sin(math.radians(self.angle))))
+			sprite.addX(self.speed*math.cos(math.radians(self.angle)))
+			sprite.addY(self.speed*math.sin(math.radians(self.angle)))
 			return self.decTime()
 
 		def mergeOpposeds(self,vectors):
 			other = vectors.get(self.getOpposedAngle())
 			if other != None:
-				if self.time > other.time:
-					vectors.pop(other.angle)
-					self.time -= other.time
-				elif self.time < other.time:
-					vectors.pop(self.angle)
-					other.time -= self.time
-				else:
-					vectors.pop(self.angle)
-					vectors.pop(other.angle)
+				if self.speed == other.speed:
+					if self.time > other.time:
+						vectors.pop(other.angle)
+						self.time -= other.time
+					elif self.time < other.time:
+						vectors.pop(self.angle)
+						other.time -= self.time
+					else:
+						vectors.pop(self.angle)
+						vectors.pop(other.angle)
 
 	class Animation:
-		def __init__(self,imageData=image.ImageData(),displayType=DisplayType.topLeft,renderOrder=4,countDown=-1,weight=1,moveable=True):
+		def __init__(self,imageData=image.ImageData(),displayType=displayType.DisplayType.topLeft,renderOrder=4,countDown=-1,weight=1,moveable=True,startFunc=None,endFunc=None):
+			def empty(param):
+				pass
+			self.startFunc = startFunc
+			self.endFunc = endFunc
+			if self.startFunc == None:
+				self.startFunc = empty
+			if self.endFunc == None:
+				self.endFunc = empty
 			self.imageData = imageData
 			self.displayType = displayType
 			self.renderOrder = renderOrder
 			self.countDown = countDown
 			self.weight = weight
 			self.moveable = moveable
+
 		def load(self,sprite):
 			sprite.addCountDown("animation",self.countDown)
 			sprite.moveable = self.moveable
 			sprite.rect.displayType = self.displayType
 			sprite.rect.renderOrder = self.renderOrder
 			sprite.image.setImageData(self.imageData)
+			self.startFunc(sprite)
 
 		def getImageData(self):
 			return self.imageData
@@ -80,9 +92,11 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 
 	# object data
 	objectData = SpriteData(hitbox.Hitbox(0, 0, 0, 0),{"default":Animation()})
-	objectType = f"{self.__module__}.{self.__name__}"
+	objectType = None
 	
 	def __init__(self, game:platform.Platform, pos: tuple,dictData={}):
+		if self.objectType == None:
+			self.objectType = f"{type(self).__module__}.{type(self).__name__}"
 		pygame.sprite.Sprite.__init__(self,game)
 		runnable.Runnable.__init__(self,game)
 		self.game = game
@@ -93,13 +107,15 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 		self.speed = 1
 		self.moveable = True
 		self.rect = rect.Rect(pygame.rect.Rect(*pos[:2], *size), pos[2])
-		self.hitbox:Rect = self.objectData.hitbox.getRect(pos)
+		self.hitbox:rect.Rect = self.objectData.hitbox.getRect(pos)
 		self.currentAnimation = "default"
 		self.loadAnimation("default")
 		self.dictManager(dictData)
 		
 	# vectors
-	def addVector(self,angle,time) -> None:
+	def addVector(self,angle:int,time:float,speed:int=None) -> None:
+		if speed == None:
+			speed = self.speed
 		vector = self.Vector(angle,time)
 		other = self.vectors.get(angle)
 		if other != None:
@@ -112,12 +128,13 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 		if self.moveable:
 			if self.game.eventHappend(self.timerEvent):
 				for vector in list(self.vectors.values()):
-					vector.update(self)
+					if vector.update(self):
+						del self.vectors[vector.angle]
 
 
 	# animations
 
-	def getAnimation(self,name:str="default") -> self.Animation:
+	def getAnimation(self,name:str="default") -> "Sprite.Animation":
 		return self.objectData.animations[name]
 
 	def loadCurrentAnimation(self) -> None:
@@ -129,11 +146,12 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 		self.currentAnimation = name
 		self.loadCurrentAnimation(self)
 
-	def getCurrentAnimation(self) -> self.Animation:
+	def getCurrentAnimation(self) -> "Sprite.Animation":
 		return self.getAnimation(self.currentAnimation)
 
 	def updateAnimations(self) -> None:
 		if self.game.eventHappend(self.timerEvent).self.countDownEnded("animation"):
+			self.getCurrentAnimation().endFunc(self)
 			self.loadAnimation()
 
 	def setAnimation(self,name) -> None:
@@ -154,7 +172,7 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 
 	def display(self,displaySurf,player,displayOffset) -> None:
 		if self.isVisible():
-			self.displayImage(displayOffset,player,displayOffset)
+			self.displayImage(displaySurf,player,displayOffset)
 
 	def displayImage(self,displaySurf:pygame,player,displayOffset) -> None:
 		offset = self.rect.subPos(self.rect.subPos(self.getAxis(),self.image.getAlignmentOffset(self.getDisplayType)),self.rect.subPos(self.getAxis(),self.rect.getByDisplay())) - displayOffset
@@ -163,16 +181,14 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 	# rect/pos
 		
 	def setX(self,x:int) -> None:
-		self.rect.rect.x = x
-		self.visionRect.Rect.centerx = x
-		self.objectData.hitbox.updateRect(self.hitbox, self.rect.getPos())
-		self.game.postEvent(self.moveEventTemplate(self.id))
+		self.rect.setX(x)
+		self.objectData.hitbox.updateRect(self.hitbox, self.rect)
+		self.addEvent(self.moveEventTemplate(self.id))
 
 	def setY(self,y:int) -> None:
-		self.rect.rect.y = y
-		self.visionRect.Rect.centery = y
-		self.objectData.hitbox.updateRect(self.hitbox, self.rect.getPos())
-		self.game.postEvent(self.moveEventTemplate(self.id))
+		self.rect.setY(y)
+		self.objectData.hitbox.updateRect(self.hitbox, self.rect)
+		self.addEvent(self.moveEventTemplate(self.id))
 		
 	def addX(self,x) -> None:
 		self.setX(self.getX()+x)
@@ -180,8 +196,11 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 	def addY(self,y) -> None:
 		self.setY(self.getY()+y)
 
-	def collideCheck(self,object:HitboxSprite) -> bool:
-		return self.hitbox.collideRect(object.hitbox)
+	def collideCheck(self,other,additionalRange:int=0) -> bool:
+		return self.collideCheckRect(other.hitbox,additionalRange)
+	
+	def collideCheckRect(self,rect:rect.Rect,additionalRange:int=0) -> bool:
+		return self.hitbox.collideRect(rect,additionalRange)
 
 	def setPos(self,pos:tuple) -> None:
 		self.setX(pos[0])
@@ -190,9 +209,8 @@ class Sprite(pygame.sprite.Sprite,runnable.Runnable):
 		
 	def setDimension(self,dimension:str) -> None:
 		self.rect.dimension = dimension
-		self.visionRect.dimension = dimension
 		self.hitbox.dimension = dimension
-		self.game.postEvent(self.moveEventTemplate(self.id))
+		self.addEvent(self.moveEventTemplate(self.id))
 
 	def getX(self) -> int:
 		return self.rect.rect.x

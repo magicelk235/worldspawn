@@ -1,4 +1,4 @@
-import pygame,enum,default,displayType    
+import pygame,enum,default,displayType,math
 
 class Rect:
     def __init__(self, rect, dimension,displayType=displayType.DisplayType.topLeft,renderOrder=4):
@@ -10,6 +10,9 @@ class Rect:
         self.displayType = displayType
         # what order in the "z-axis" the object will display, 4 is normal and calculated by y,the bigger the later
         self.renderOrder = renderOrder
+        
+        self.fracX = 0
+        self.fracY = 0
 
     @staticmethod
     def addPos(pos1,pos2):
@@ -17,24 +20,6 @@ class Rect:
     @staticmethod
     def subPos(pos1,pos2):
         return pos1[0] - pos2[0],pos1[1]-pos2[1]
-
-    def moveToPoint(self, targetPos, speed):
-        if self.dimension != targetPos[2]:
-            return
-        cx, cy = self.rect.center
-        tx, ty = targetPos
-        dx = tx - cx
-        dy = ty - cy
-        distance = math.hypot(dx, dy)
-        if distance <= speed or distance == 0:
-            self.rect.center = targetPos[:2]
-
-        else:
-            nx = dx / distance
-            ny = dy / distance
-            self.rect.centerx += nx * speed
-            self.rect.centery += ny * speed
-        return self.rect.center == targetPos[:2]
 
     def setByDisplay(self,pos):
         default.setAttr(self,"rect." + self.displayType, pos)
@@ -49,17 +34,34 @@ class Rect:
         self.setW(w)
         self.setH(h)
 
-    
-
-    def setXY(self,x,y):
+    def setAxis(self,x,y):
         self.setX(x)
         self.setY(y)
 
-    def getXY(self):
+    def setX(self,x):
+        self.rect.x = int(x)
+        self.fracX = x-int(x)
+        if int(self.fracX) > 1:
+            self.rect.x += int(self.fracX)
+            self.fracX -= int(self.fracX)
+
+    def setX(self,y):
+        self.rect.y = int(y)
+        self.fracX = y-int(y)
+        if int(self.fracX) > 1:
+            self.rect.y += int(self.fracY)
+            self.fracY -= int(self.fracY)
+
+    def setDimension(self,dimension):
+        self.dimension = dimension
+
+    def getAxis(self):
         return self.rect.x,self.rect.y
 
     def getPos(self):
         return self.rect.x,self.rect.y,self.dimension
+
+
 
     def getByDisplay(self):
         return default.getAttr(self,"rect." + self.displayType)
@@ -83,10 +85,10 @@ class Rect:
         return self.rect.h
 
     def calculateDistanceX(self,otherRect):
-        return ((otherRect.Rect.centerx - self.rect.centerx) ** 2)**0.5
+        return ((otherRect.Rect.centerx+otherRect.fracX - self.rect.centerx+self.fracX) ** 2)**0.5
 
     def calculateDistanceY(self,otherRect):
-        return ((otherRect.Rect.centery - self.rect.centery) ** 2)**0.5
+        return ((otherRect.Rect.centery+otherRect.fracY - self.rect.centery+self.fracY) ** 2)**0.5
 
     def calculateDistance(self,otherRect):
         return self.calculateDistanceX(otherRect) + self.calculateDistanceY(otherRect)

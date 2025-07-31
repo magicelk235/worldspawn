@@ -8,7 +8,7 @@ def load(path,validExtensions,mediaDict,mediaLoadFunction):
                 fullPath = os.path.join(dirpath, filename)
                 try:
                     mediaObject = mediaLoadFunction(fullPath)
-                except Exception as e:
+                except:
                     continue
                 unClearedPath = os.path.relpath(fullPath, start=validExtensions).replace(os.sep, "/")
                 relativePath, _ = os.path.splitext(unClearedPath)
